@@ -17,7 +17,7 @@ export const categories = {
       description: 'Medical expenses and healthcare',
       suggestedLimit: 0.1
     },
-    'Emergency Fund': {
+    'Emergency Fund and Targets': {
       primary: '#FFA502',
       gradient: 'linear-gradient(135deg, #FFA502 0%, #FFBE76 100%)',
       hover: '#FFBE76',
@@ -88,6 +88,15 @@ export const categories = {
       icon: '📌',
       description: 'Miscellaneous expenses',
       suggestedLimit: 0.05
+    },
+    Investments: {
+      primary: '#27ae60',
+      gradient: 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)',
+      hover: '#2ecc71',
+      icon: '📈',
+      description:
+        'Investments and target savings for major goals (e.g., Gold Chain, iPhone, Foreign Trip, Custom PC)',
+      suggestedLimit: 0.15 // 15% of income
     }
   };
   
@@ -98,13 +107,6 @@ export const categories = {
       hover: '#4ADE80',
       icon: '💵',
       description: 'Regular employment income'
-    },
-    Investment: {
-      primary: '#3B82F6',
-      gradient: 'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
-      hover: '#60A5FA',
-      icon: '📈',
-      description: 'Returns from investments'
     },
     Business: {
       primary: '#8B5CF6',
