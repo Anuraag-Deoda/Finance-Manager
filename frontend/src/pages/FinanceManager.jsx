@@ -13,9 +13,17 @@ import {
     categories, incomeCategories, familyMembers, TRANSACTION_TYPES,
     budgetStatus, chartColors, dateRanges
 } from "../utils/constants";
+import UserProfile from '../components/UserProfile';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { logout } from '../redux/authSlice';
+
 
 const FinanceManager = () => {
     // Core state management
+    const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const [user, setUser] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedDateRange, setSelectedDateRange] = useState(dateRanges.MONTHLY);
@@ -61,7 +69,7 @@ const FinanceManager = () => {
         try {
             setLoading(true);
             setError(null);
-            const response = await api.get('/transactions', {
+            const response = await api.get('transactions', {
                 params: {
                     month: selectedMonthPlan,
                     type: transactionFilter !== 'all' ? transactionFilter : undefined
@@ -80,8 +88,8 @@ const FinanceManager = () => {
     const fetchDashboardData = async () => {
         try {
             const [dashboardResponse, familyDashboardResponse] = await Promise.all([
-                api.get('/dashboard'),
-                api.get('/family-dashboard')
+                api.get('dashboard'),
+                api.get('family-dashboard')
             ]);
 
             setDashboardData({
@@ -100,9 +108,26 @@ const FinanceManager = () => {
         fetchDashboardData();
     }, [selectedMonthPlan, transactionFilter]);
 
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const response = await api.get('user/profile');
+                setUser(response.data);
+            } catch (err) {
+                console.error('Failed to fetch user profile:', err);
+            }
+        };
+        fetchUserData();
+    }, []);
+
+    const handleLogout = () => {
+        dispatch(logout());
+        navigate('/login');
+    };
+
     // Memoized filtered transactions for current month
     const monthTransactions = useMemo(() => {
-        return transactions.filter(transaction => 
+        return transactions.filter(transaction =>
             transaction.date.startsWith(selectedMonthPlan)
         );
     }, [transactions, selectedMonthPlan]);
@@ -114,7 +139,7 @@ const FinanceManager = () => {
 
         try {
             setLoading(true);
-            const response = await api.post('/transactions', newTransaction);
+            const response = await api.post('transactions', newTransaction);
 
             setTransactions(prev => [...prev, { ...newTransaction, id: response.data.id }]);
             setShowAddModal(false);
@@ -140,7 +165,7 @@ const FinanceManager = () => {
     const handleEditTransaction = async (transaction) => {
         try {
             setLoading(true);
-            await api.put(`/transactions/${transaction.id}`, transaction);
+            await api.put(`transactions/${transaction.id}`, transaction);
 
             setTransactions(prev =>
                 prev.map(t => t.id === transaction.id ? transaction : t)
@@ -160,7 +185,7 @@ const FinanceManager = () => {
 
         try {
             setLoading(true);
-            await api.delete(`/transactions/${id}`);
+            await api.delete(`transactions/${id}`);
 
             setTransactions(prev => prev.filter(t => t.id !== id));
             fetchDashboardData();
@@ -175,7 +200,7 @@ const FinanceManager = () => {
     // Monthly Plan Integration
     const fetchMonthlyPlan = async (month) => {
         try {
-            const response = await api.get(`/monthly-plans/${month}`);
+            const response = await api.get(`monthly-plans/${month}`);
             setMonthPlan(response.data);
         } catch (err) {
             console.error('Error fetching monthly plan:', err);
@@ -186,7 +211,7 @@ const FinanceManager = () => {
     const handleSavePlan = async (plan) => {
         try {
             setLoading(true);
-            await api.put(`/monthly-plans/${plan.month}`, plan);
+            await api.put(`monthly-plans/${plan.month}`, plan);
             setMonthPlan(plan);
         } catch (err) {
             setError('Failed to save plan');
@@ -582,15 +607,25 @@ const FinanceManager = () => {
                 {/* Modified Header Section */}
                 <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-3 rounded-xl">
-                                <Wallet className="w-8 h-8 text-blue-600" />
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-100 p-3 rounded-xl">
+                                    <Wallet className="w-8 h-8 text-blue-600" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                                        Finance Manager
+                                    </h1>
+                                    <p className="text-gray-500">Track your family expenses</p>
+                                </div>
                             </div>
-                            <div>
-                                <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-                                    Finance Manager
-                                </h1>
-                                <p className="text-gray-500">Track your family expenses</p>
+
+                            {/* Add UserProfile component here, before the existing navigation buttons */}
+                            <div className="flex items-center gap-4">
+                                <div className="flex gap-2">
+                                    {/* Existing navigation buttons */}
+                                </div>
+                                <UserProfile user={user} onLogout={handleLogout} />
                             </div>
                         </div>
 
@@ -599,8 +634,8 @@ const FinanceManager = () => {
                             <button
                                 onClick={() => setActiveView("dashboard")}
                                 className={`px-4 py-2 rounded-xl transition-all duration-200 ${activeView === "dashboard"
-                                        ? "bg-blue-100 text-blue-600 font-medium"
-                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                    ? "bg-blue-100 text-blue-600 font-medium"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                     }`}
                             >
                                 Dashboard
@@ -608,8 +643,8 @@ const FinanceManager = () => {
                             <button
                                 onClick={() => setActiveView("planner")}
                                 className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 ${activeView === "planner"
-                                        ? "bg-blue-100 text-blue-600 font-medium"
-                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                    ? "bg-blue-100 text-blue-600 font-medium"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                     }`}
                             >
                                 <CalendarIcon className="w-4 h-4" />
@@ -1179,8 +1214,8 @@ const FinanceManager = () => {
                                         <button
                                             onClick={() => setTransactionFilter("all")}
                                             className={`px-4 py-2 rounded-xl transition-all duration-200 ${transactionFilter === "all"
-                                                    ? "bg-blue-100 text-blue-600 font-medium"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                ? "bg-blue-100 text-blue-600 font-medium"
+                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                 }`}
                                         >
                                             All
@@ -1188,8 +1223,8 @@ const FinanceManager = () => {
                                         <button
                                             onClick={() => setTransactionFilter("expense")}
                                             className={`px-4 py-2 rounded-xl transition-all duration-200 ${transactionFilter === "expense"
-                                                    ? "bg-red-100 text-red-600 font-medium"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                ? "bg-red-100 text-red-600 font-medium"
+                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                 }`}
                                         >
                                             Expenses
@@ -1197,8 +1232,8 @@ const FinanceManager = () => {
                                         <button
                                             onClick={() => setTransactionFilter("income")}
                                             className={`px-4 py-2 rounded-xl transition-all duration-200 ${transactionFilter === "income"
-                                                    ? "bg-green-100 text-green-600 font-medium"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                ? "bg-green-100 text-green-600 font-medium"
+                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                 }`}
                                         >
                                             Income
@@ -1269,8 +1304,8 @@ const FinanceManager = () => {
                                                             {/* Category Icon */}
                                                             <div
                                                                 className={`p-3 rounded-xl ${transaction.type === TRANSACTION_TYPES.INCOME
-                                                                        ? "bg-green-100"
-                                                                        : "bg-red-100"
+                                                                    ? "bg-green-100"
+                                                                    : "bg-red-100"
                                                                     }`}
                                                             >
                                                                 {transaction.type === TRANSACTION_TYPES.INCOME
@@ -1307,8 +1342,8 @@ const FinanceManager = () => {
                                                         <div className="flex items-center gap-4">
                                                             <span
                                                                 className={`font-medium ${transaction.type === TRANSACTION_TYPES.INCOME
-                                                                        ? "text-green-600"
-                                                                        : "text-red-600"
+                                                                    ? "text-green-600"
+                                                                    : "text-red-600"
                                                                     }`}
                                                             >
                                                                 {transaction.type === TRANSACTION_TYPES.INCOME
@@ -1373,8 +1408,8 @@ const FinanceManager = () => {
                                                 key={page}
                                                 onClick={() => setCurrentPage(page)}
                                                 className={`px-4 py-2 rounded-xl transition-all duration-200 ${currentPage === page
-                                                        ? "bg-blue-100 text-blue-600 font-medium"
-                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                    ? "bg-blue-100 text-blue-600 font-medium"
+                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                                     }`}
                                             >
                                                 {page}

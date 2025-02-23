@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from config import Config
-from models import db, User, Transaction, MonthlyPlan, Family, Invitation
+from models import db, User, Transaction, MonthlyPlan, Family, Invitation, FamilyMember
 import random
 import string
 from datetime import datetime, timedelta
@@ -73,6 +73,475 @@ def handle_errors(f):
 # Helper Functions
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
+
+
+
+# Add these routes to app.py
+
+# User Profile Routes
+@app.route('/api/user/profile', methods=['GET'])
+@jwt_required()
+@handle_errors
+def get_user_profile():
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    return jsonify({
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'profile_image': user.profile_image,
+        'role': user.role
+    })
+
+@app.route('/api/user/profile', methods=['PUT'])
+@jwt_required()
+@handle_errors
+def update_user_profile():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get_or_404(user_id)
+        data = request.get_json()
+
+        if 'name' in data:
+            user.name = data['name']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'profile_image': user.profile_image
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in update_user_profile: {str(e)}")
+        return jsonify({'message': 'Failed to update profile'}), 500
+
+import os
+from werkzeug.utils import secure_filename
+from datetime import datetime
+
+# Add these configurations to your app
+UPLOAD_FOLDER = 'static/profile_images'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/user/profile/image', methods=['POST'])
+@jwt_required()
+@handle_errors
+def upload_profile_image():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get_or_404(user_id)
+
+        if 'image' not in request.files:
+            return jsonify({'message': 'No image file provided'}), 400
+            
+        file = request.files['image']
+        
+        if file.filename == '':
+            return jsonify({'message': 'No selected file'}), 400
+            
+        if file and allowed_file(file.filename):
+            # Create unique filename
+            filename = secure_filename(file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            unique_filename = f"{user_id}_{timestamp}_{filename}"
+            
+            # Save file
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(filepath)
+            
+            # Update user profile
+            # Delete old profile image if exists
+            if user.profile_image:
+                old_filepath = os.path.join(app.root_path, user.profile_image.lstrip('/'))
+                if os.path.exists(old_filepath):
+                    os.remove(old_filepath)
+            
+            # Update database with new image path
+            user.profile_image = f'/static/profile_images/{unique_filename}'
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Profile image updated successfully',
+                'profile_image': user.profile_image
+            })
+        
+        return jsonify({'message': 'Invalid file type'}), 400
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in upload_profile_image: {str(e)}")
+        return jsonify({'message': 'Failed to upload profile image'}), 500
+
+
+# Category Routes
+@app.route('/api/categories', methods=['GET'])
+@jwt_required()
+@handle_errors
+def get_categories():
+    user_id = get_jwt_identity()
+    categories = Category.query.filter_by(user_id=user_id).all()
+    return jsonify([{
+        'id': cat.id,
+        'name': cat.name,
+        'type': cat.type,
+        'icon': cat.icon,
+        'color': cat.color,
+        'description': cat.description,
+        'suggested_limit': cat.suggested_limit
+    } for cat in categories])
+
+@app.route('/api/categories', methods=['POST'])
+@jwt_required()
+@handle_errors
+def add_category():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    category = Category(
+        name=data['name'],
+        type=data['type'],
+        icon=data['icon'],
+        color=data['color'],
+        description=data.get('description', ''),
+        suggested_limit=data.get('suggested_limit'),
+        user_id=user_id
+    )
+    
+    db.session.add(category)
+    db.session.commit()
+    
+    return jsonify({
+        'id': category.id,
+        'name': category.name,
+        'type': category.type,
+        'icon': category.icon,
+        'color': category.color,
+        'description': category.description,
+        'suggested_limit': category.suggested_limit
+    }), 201
+
+@app.route('/api/categories/<int:id>', methods=['PUT'])
+@jwt_required()
+@handle_errors
+def update_category(id):
+    user_id = get_jwt_identity()
+    category = Category.query.filter_by(id=id, user_id=user_id).first_or_404()
+    data = request.get_json()
+    
+    category.name = data.get('name', category.name)
+    category.icon = data.get('icon', category.icon)
+    category.color = data.get('color', category.color)
+    category.description = data.get('description', category.description)
+    category.suggested_limit = data.get('suggested_limit', category.suggested_limit)
+    
+    db.session.commit()
+    return jsonify({'message': 'Category updated successfully'})
+
+@app.route('/api/categories/<int:id>', methods=['DELETE'])
+@jwt_required()
+@handle_errors
+def delete_category(id):
+    user_id = get_jwt_identity()
+    category = Category.query.filter_by(id=id, user_id=user_id).first_or_404()
+    db.session.delete(category)
+    db.session.commit()
+    return jsonify({'message': 'Category deleted successfully'})
+
+# Family Member Routes
+@app.route('/api/family/members', methods=['GET'])
+@jwt_required()
+@handle_errors
+def get_family_members():
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    family_members = FamilyMember.query.filter_by(family_id=user.family_id).all()
+    return jsonify([{
+        'id': member.id,
+        'name': member.name,
+        'role': member.role,
+        'icon': member.icon,
+        'color': member.color
+    } for member in family_members])
+
+
+@app.route('/api/family/members/<int:id>', methods=['PUT'])
+@jwt_required()
+@handle_errors
+def update_family_member(id):
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    member = FamilyMember.query.filter_by(id=id, family_id=user.family_id).first_or_404()
+    data = request.get_json()
+    
+    member.name = data.get('name', member.name)
+    member.role = data.get('role', member.role)
+    member.icon = data.get('icon', member.icon)
+    member.color = data.get('color', member.color)
+    
+    db.session.commit()
+    return jsonify({'message': 'Family member updated successfully'})
+
+@app.route('/api/family/members/<int:id>', methods=['DELETE'])
+@jwt_required()
+@handle_errors
+def delete_family_member(id):
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    member = FamilyMember.query.filter_by(id=id, family_id=user.family_id).first_or_404()
+    db.session.delete(member)
+    db.session.commit()
+    return jsonify({'message': 'Family member deleted successfully'})
+
+# Family Invitation Routes
+@app.route('/api/family/invite', methods=['POST'])
+@jwt_required()
+@handle_errors
+def invite_family_member():
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+    
+    if not user.family_id:
+        return jsonify({'message': 'You are not part of a family'}), 400
+        
+    invitation = Invitation(
+        email=data['email'],
+        family_id=user.family_id,
+        otp=generate_otp(),
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    
+    db.session.add(invitation)
+    db.session.commit()
+    
+    # Send invitation email
+    try:
+        msg = Message(
+            'Family Finance Tracker Invitation',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[data['email']]
+        )
+        msg.body = f'''You have been invited to join a family on Finance Tracker.
+        Your invitation code is: {invitation.otp}
+        This code will expire in 7 days.'''
+        mail.send(msg)
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        
+    return jsonify({'message': 'Invitation sent successfully'})
+    
+
+
+# Add these routes to app.py
+
+@app.route('/api/family/users/search', methods=['GET'])
+@jwt_required()
+@handle_errors
+def search_users():
+    """Search for users by email to add to family"""
+    query = request.args.get('query', '').lower()
+    if not query:
+        return jsonify([])
+        
+    users = User.query.filter(User.email.ilike(f'%{query}%')).limit(5).all()
+    return jsonify([{
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'profile_image': user.profile_image
+    } for user in users])
+
+@app.route('/api/family/create', methods=['POST'])
+@jwt_required()
+@handle_errors
+def create_family():
+    """Create a new family"""
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+
+    if user.family_id:
+        return jsonify({'message': 'You are already part of a family'}), 400
+
+    family = Family(
+        name=data['name'],
+        created_by=user_id
+    )
+    db.session.add(family)
+    db.session.flush()  # Get family ID
+
+    # Set user as family admin
+    user.family_id = family.id
+    user.is_family_admin = True
+
+    # Create initial family member entry for the creator
+    member = FamilyMember(
+        name=user.name or 'Family Admin',
+        role=data.get('role', 'Parent'),
+        icon=data.get('icon', '👤'),
+        color=data.get('color', '#4ECDC4'),
+        family_id=family.id,
+        user_id=user_id
+    )
+    db.session.add(member)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Family created successfully',
+        'family_id': family.id
+    }), 201
+
+@app.route('/api/family/members/invite', methods=['POST'])
+@jwt_required()
+@handle_errors
+def invite_to_family():
+    """Invite a user to join the family"""
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+
+    if not user.family_id:
+        return jsonify({'message': 'You are not part of a family'}), 400
+
+    # Check if user is authorized to send invites
+    if not user.is_family_admin:
+        return jsonify({'message': 'Only family admins can send invitations'}), 403
+
+    # Check if user is already in a family
+    existing_user = User.query.filter_by(email=data['email']).first()
+    if existing_user and existing_user.family_id:
+        return jsonify({'message': 'User is already part of a family'}), 400
+
+    # Create invitation
+    invitation = Invitation(
+        email=data['email'],
+        family_id=user.family_id,
+        invited_by=user_id,
+        role=data.get('role', 'member'),
+        otp=generate_otp(),
+        expires_at=datetime.utcnow() + timedelta(days=7)
+    )
+    db.session.add(invitation)
+    db.session.commit()
+
+    # Send invitation email
+    try:
+        msg = Message(
+            'Family Finance Tracker Invitation',
+            sender=app.config['MAIL_USERNAME'],
+            recipients=[data['email']]
+        )
+        msg.body = f'''You have been invited to join {user.name}'s family on Finance Tracker.
+        Your invitation code is: {invitation.otp}
+        This code will expire in 7 days.'''
+        mail.send(msg)
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+
+    return jsonify({'message': 'Invitation sent successfully'})
+
+@app.route('/api/family/members/add', methods=['POST'])
+@jwt_required()
+@handle_errors
+def add_family_member():
+    """Add an existing user to the family"""
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+
+    if not user.family_id or not user.is_family_admin:
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    member_user = User.query.get_or_404(data['user_id'])
+    if member_user.family_id:
+        return jsonify({'message': 'User is already part of a family'}), 400
+
+    # Add user to family
+    member_user.family_id = user.family_id
+
+    # Create family member entry
+    member = FamilyMember(
+        name=member_user.name or member_user.email,
+        role=data['role'],
+        icon=data.get('icon', '👤'),
+        color=data.get('color', '#4ECDC4'),
+        family_id=user.family_id,
+        user_id=member_user.id
+    )
+    db.session.add(member)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Family member added successfully',
+        'member': {
+            'id': member.id,
+            'name': member.name,
+            'role': member.role,
+            'icon': member.icon,
+            'color': member.color
+        }
+    })
+
+@app.route('/api/family/members/join', methods=['POST'])
+@jwt_required()
+@handle_errors
+def join_family():
+    """Join a family using invitation code"""
+    user_id = get_jwt_identity()
+    user = User.query.get_or_404(user_id)
+    data = request.get_json()
+
+    if user.family_id:
+        return jsonify({'message': 'You are already part of a family'}), 400
+
+    invitation = Invitation.query.filter_by(
+        email=user.email,
+        otp=data['otp'],
+        status='pending'
+    ).first_or_404()
+
+    if invitation.expires_at < datetime.utcnow():
+        return jsonify({'message': 'Invitation has expired'}), 400
+
+    # Add user to family
+    user.family_id = invitation.family_id
+
+    # Create family member entry
+    member = FamilyMember(
+        name=user.name or user.email,
+        role=invitation.role,
+        icon=data.get('icon', '👤'),
+        color=data.get('color', '#4ECDC4'),
+        family_id=invitation.family_id,
+        user_id=user_id
+    )
+    db.session.add(member)
+
+    # Update invitation status
+    invitation.status = 'accepted'
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Successfully joined family',
+        'family_id': invitation.family_id
+    })
+
 
 # Authentication Routes
 @app.route('/api/register', methods=['POST'])
