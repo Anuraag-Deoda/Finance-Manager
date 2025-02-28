@@ -9,12 +9,13 @@ import {
 import api from '../services/api';
 import {
     Users, AlertTriangle, TrendingUp, PieChart,
-    UserPlus, Trash2, Mail
+    UserPlus, Trash2, Mail, Sparkles
 } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis,
     CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import AIFamilyBudgetOptimizer from './ai/AIFamilyBudgetOptimizer';
 
 const FamilyDashboard = () => {
     // Redux
@@ -35,6 +36,7 @@ const FamilyDashboard = () => {
         categoryBreakdown: {}
     });
     const [dateRange, setDateRange] = useState('month'); // month, quarter, year
+    const [aiOptimizationApplied, setAiOptimizationApplied] = useState(false);
 
     // Initial data loading
     useEffect(() => {
@@ -140,42 +142,63 @@ const FamilyDashboard = () => {
         }
     };
 
-    // Memoized data for charts
-    const chartData = useMemo(() => {
-        // Member contributions chart data
-        const memberData = Object.entries(familyStats.memberContributions).map(([member, data]) => ({
-            name: member,
-            income: data.income,
-            expenses: data.expenses,
-            balance: data.income - data.expenses
-        }));
+    // Handle budget optimization application
+    const handleApplyOptimization = async (optimizedBudget) => {
+        try {
+            setLoading(true);
+            await api.post('/family/apply-budget', { 
+                optimizedBudget, 
+                familyId: family.id 
+            });
+            
+            // Update the UI to reflect the applied optimization
+            setAiOptimizationApplied(true);
+            
+            // Show success message and refresh data
+            setTimeout(() => {
+                fetchFamilyTransactions();
+            }, 500);
+        } catch (err) {
+            setError('Failed to apply optimized budget');
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        // Category breakdown chart data
-        const categoryData = Object.entries(familyStats.categoryBreakdown).map(([category, amount]) => ({
-            name: category,
-            value: amount
-        }));
+    // Chart Data Preparation
+    const prepareMemberData = useMemo(() => {
+        return family.members
+            .map((member) => {
+                const memberStats = familyStats.memberContributions[member.name] || { income: 0, expenses: 0 };
+                return {
+                    name: member.name,
+                    income: memberStats.income || 0,
+                    expenses: memberStats.expenses || 0,
+                    balance: (memberStats.income || 0) - (memberStats.expenses || 0),
+                    color: member.color,
+                    icon: member.icon,
+                };
+            })
+            .filter((item) => item.income > 0 || item.expenses > 0)
+            .sort((a, b) => b.expenses - a.expenses);
+    }, [family.members, familyStats.memberContributions]);
 
-        // Timeline data
-        const timelineData = transactions.reduce((acc, transaction) => {
-            const date = transaction.date;
-            if (!acc[date]) {
-                acc[date] = { date, income: 0, expenses: 0 };
+    const prepareTimelineData = useMemo(() => {
+        const timeline = {};
+        transactions.forEach((t) => {
+            const date = t.date;
+            if (!timeline[date]) {
+                timeline[date] = { date, income: 0, expense: 0 };
             }
-            if (transaction.type === 'income') {
-                acc[date].income += parseFloat(transaction.amount);
+            if (t.type === 'income') {
+                timeline[date].income += parseFloat(t.amount);
             } else {
-                acc[date].expenses += parseFloat(transaction.amount);
+                timeline[date].expense += parseFloat(t.amount);
             }
-            return acc;
-        }, {});
+        });
 
-        return {
-            memberData,
-            categoryData,
-            timelineData: Object.values(timelineData).sort((a, b) => new Date(a.date) - new Date(b.date))
-        };
-    }, [familyStats, transactions]);
+        return Object.values(timeline).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }, [transactions]);
 
     // Format currency helper
     const formatCurrency = (amount) => {
@@ -187,19 +210,13 @@ const FamilyDashboard = () => {
         }).format(amount);
     };
 
-    // Calculate member stats
-    const getMemberStats = (memberId) => {
-        const memberTransactions = transactions.filter(t => t.userId === memberId);
-        return {
-            totalIncome: memberTransactions.reduce((sum, t) =>
-                t.type === 'income' ? sum + parseFloat(t.amount) : sum, 0
-            ),
-            totalExpenses: memberTransactions.reduce((sum, t) =>
-                t.type === 'expense' ? sum + parseFloat(t.amount) : sum, 0
-            ),
-            transactions: memberTransactions
-        };
-    };
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
@@ -213,7 +230,7 @@ const FamilyDashboard = () => {
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-800">Family Finance</h1>
-                                <p className="text-gray-500">Manage your familys finances together</p>
+                                <p className="text-gray-500">Manage your family's finances together</p>
                             </div>
                         </div>
                         {family.isAdmin && (
@@ -228,6 +245,14 @@ const FamilyDashboard = () => {
                     </div>
                 </div>
 
+                {/* AI Family Budget Optimizer */}
+                <AIFamilyBudgetOptimizer
+                    familyMembers={family.members}
+                    currentAllocations={familyStats.memberContributions}
+                    totalBudget={familyStats.totalExpenses}
+                    onApplyOptimization={handleApplyOptimization}
+                />
+
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
@@ -238,6 +263,12 @@ const FamilyDashboard = () => {
                             </div>
                         </div>
                         <p className="text-3xl font-bold text-green-600">{formatCurrency(familyStats.totalIncome)}</p>
+                        {aiOptimizationApplied && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-purple-600">
+                                <Sparkles className="w-3 h-3"/>
+                                <span>AI-optimized distribution applied</span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
@@ -267,7 +298,7 @@ const FamilyDashboard = () => {
                         <h3 className="text-lg font-semibold text-gray-800 mb-6">Member Contributions</h3>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData.memberData} layout="vertical">
+                                <BarChart data={prepareMemberData} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" tickFormatter={formatCurrency} />
                                     <YAxis dataKey="name" type="category" />
@@ -284,7 +315,7 @@ const FamilyDashboard = () => {
                         <h3 className="text-lg font-semibold text-gray-800 mb-6">Income vs Expenses</h3>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData.timelineData}>
+                                <LineChart data={prepareTimelineData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="date" />
                                     <YAxis tickFormatter={formatCurrency} />
@@ -305,8 +336,11 @@ const FamilyDashboard = () => {
                         {family.members.map((member) => (
                             <div key={member.id} className="py-4 flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-gray-100 rounded-xl">
-                                        <Users className="w-5 h-5 text-gray-600" />
+                                    <div 
+                                        className="p-3 rounded-xl" 
+                                        style={{ backgroundColor: `${member.color}20` }}
+                                    >
+                                        <div className="text-xl">{member.icon}</div>
                                     </div>
                                     <div>
                                         <h4 className="font-medium text-gray-900">{member.name}</h4>
@@ -315,7 +349,10 @@ const FamilyDashboard = () => {
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className="font-medium text-gray-900">
-                                        {formatCurrency(getMemberStats(member.id).totalIncome - getMemberStats(member.id).totalExpenses)}
+                                        {formatCurrency(
+                                            (familyStats.memberContributions[member.name]?.income || 0) - 
+                                            (familyStats.memberContributions[member.name]?.expenses || 0)
+                                        )}
                                     </span>
                                     {family.isAdmin && member.id !== user.id && (
                                         <button
@@ -371,7 +408,6 @@ const FamilyDashboard = () => {
             </div>
         </div>
     );
-
 };
 
 export default FamilyDashboard;

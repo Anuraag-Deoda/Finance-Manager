@@ -4,17 +4,30 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from config import Config
-from models import db, User, Transaction, MonthlyPlan, Family, Invitation, FamilyMember
+from models import db, User, Transaction, MonthlyPlan, Family, Invitation, FamilyMember, Category
 import random
 import string
 from datetime import datetime, timedelta
 import bcrypt
 from functools import wraps
+import logging
+from ai.routes import ai_bp
+
+# Register the blueprint
 
 app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 jwt = JWTManager(app)
+app.register_blueprint(ai_bp, url_prefix='/api/ai')
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Configure CORS
 CORS(app, resources={
@@ -73,10 +86,6 @@ def handle_errors(f):
 # Helper Functions
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
-
-
-
-# Add these routes to app.py
 
 # User Profile Routes
 @app.route('/api/user/profile', methods=['GET'])
@@ -188,7 +197,6 @@ def upload_profile_image():
         print(f"Error in upload_profile_image: {str(e)}")
         return jsonify({'message': 'Failed to upload profile image'}), 500
 
-
 # Category Routes
 @app.route('/api/categories', methods=['GET'])
 @jwt_required()
@@ -279,7 +287,6 @@ def get_family_members():
         'color': member.color
     } for member in family_members])
 
-
 @app.route('/api/family/members/<int:id>', methods=['PUT'])
 @jwt_required()
 @handle_errors
@@ -345,10 +352,6 @@ def invite_family_member():
         print(f"Failed to send email: {str(e)}")
         
     return jsonify({'message': 'Invitation sent successfully'})
-    
-
-
-# Add these routes to app.py
 
 @app.route('/api/family/users/search', methods=['GET'])
 @jwt_required()
@@ -541,7 +544,6 @@ def join_family():
         'message': 'Successfully joined family',
         'family_id': invitation.family_id
     })
-
 
 # Authentication Routes
 @app.route('/api/register', methods=['POST'])
@@ -839,9 +841,21 @@ def get_family_dashboard():
 def get_monthly_plan(month):
     try:
         user_id = get_jwt_identity()
-        plan = MonthlyPlan.query.filter_by(month=month, user_id=int(user_id)).first()
+        user = User.query.get(user_id)
+        
+        if not user.family_id:
+            logger.error(f"User {user_id} does not belong to a family")
+            return jsonify({'message': 'User does not belong to a family'}), 400
+            
+        logger.info(f"Fetching monthly plan for user {user_id}, family {user.family_id}, month {month}")
+        
+        plan = MonthlyPlan.query.filter_by(
+            month=month,
+            family_id=user.family_id
+        ).first()
         
         if not plan:
+            logger.info(f"No plan found for month {month}, creating default response")
             return jsonify({
                 'month': month,
                 'expectedIncome': [],
@@ -849,6 +863,7 @@ def get_monthly_plan(month):
                 'notes': ''
             })
 
+        logger.info(f"Successfully retrieved plan for month {month}")
         return jsonify({
             'month': plan.month,
             'expectedIncome': plan.expected_income,
@@ -856,6 +871,7 @@ def get_monthly_plan(month):
             'notes': plan.notes
         })
     except Exception as e:
+        logger.error(f"Error in get_monthly_plan: {str(e)}", exc_info=True)
         return jsonify({'message': 'Failed to fetch monthly plan', 'error': str(e)}), 500
 
 @app.route('/api/monthly-plans/<month>', methods=['PUT'])
@@ -864,30 +880,47 @@ def get_monthly_plan(month):
 def save_monthly_plan(month):
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         data = request.get_json()
         
+        if not user.family_id:
+            logger.error(f"User {user_id} does not belong to a family")
+            return jsonify({'message': 'User does not belong to a family'}), 400
+            
         if not data:
+            logger.error("No data provided in request")
             return jsonify({'message': 'No data provided'}), 400
 
-        plan = MonthlyPlan.query.filter_by(month=month, user_id=int(user_id)).first()
+        logger.info(f"Saving monthly plan for user {user_id}, family {user.family_id}, month {month}")
+        
+        plan = MonthlyPlan.query.filter_by(
+            month=month,
+            family_id=user.family_id
+        ).first()
+        
         if not plan:
+            logger.info("Creating new monthly plan")
             plan = MonthlyPlan(
                 month=month,
-                user_id=int(user_id),
+                family_id=user.family_id,
+                created_by=user_id,
                 expected_income=data.get('expectedIncome', []),
                 expected_expenses=data.get('expectedExpenses', []),
                 notes=data.get('notes', '')
             )
             db.session.add(plan)
         else:
+            logger.info("Updating existing monthly plan")
             plan.expected_income = data.get('expectedIncome', plan.expected_income)
             plan.expected_expenses = data.get('expectedExpenses', plan.expected_expenses)
             plan.notes = data.get('notes', plan.notes)
 
         db.session.commit()
+        logger.info("Successfully saved monthly plan")
         return jsonify({'message': 'Plan saved successfully'})
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error in save_monthly_plan: {str(e)}", exc_info=True)
         return jsonify({'message': 'Failed to save monthly plan', 'error': str(e)}), 500
 
 # Error Handlers

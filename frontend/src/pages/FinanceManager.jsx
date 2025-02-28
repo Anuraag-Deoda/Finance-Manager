@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import {
     Plus, Wallet, PieChart as PieChartIcon, TrendingUp, Calendar,
-    Users, Pencil, Trash2, Receipt, Search, X, Calendar as CalendarIcon
+    Users, Pencil, Trash2, Receipt, Search, X, Calendar as CalendarIcon, FileText
 } from "lucide-react";
 import {
     categories, incomeCategories, familyMembers, TRANSACTION_TYPES,
@@ -17,7 +17,12 @@ import UserProfile from '../components/UserProfile';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { logout } from '../redux/authSlice';
-
+import AIChatComponent from "../components/ai/AIChatComponent.jsx";
+import AIInsightsPanel from "../components/ai/AIInsightsPanel.jsx";
+import AINotificationSystem from "../components/ai/AINotificationSystem.jsx";
+import AIReportGenerator from "../components/ai/AIReportGenerator.jsx";
+import AIFamilyBudgetOptimizer from "../components/ai/AIFamilyBudgetOptimizer.jsx";
+import AISavingsPlanner from "../components/ai/AISavingsPlanner.jsx";
 
 const FinanceManager = () => {
     // Core state management
@@ -604,80 +609,86 @@ const FinanceManager = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* Modified Header Section */}
+                {/* Header Section with AI Notifications */}
                 <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-blue-100 p-3 rounded-xl">
-                                    <Wallet className="w-8 h-8 text-blue-600" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-                                        Finance Manager
-                                    </h1>
-                                    <p className="text-gray-500">Track your family expenses</p>
-                                </div>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-100 p-3 rounded-xl">
+                                <Wallet className="w-8 h-8 text-blue-600" />
                             </div>
-
-                            {/* Add UserProfile component here, before the existing navigation buttons */}
-                            <div className="flex items-center gap-4">
-                                <div className="flex gap-2">
-                                    {/* Existing navigation buttons */}
-                                </div>
-                                <UserProfile user={user} onLogout={handleLogout} />
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                                    Finance Manager
+                                </h1>
+                                <p className="text-gray-500">Track your family expenses</p>
                             </div>
                         </div>
-
-                        {/* Add Navigation Tabs */}
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setActiveView("dashboard")}
-                                className={`px-4 py-2 rounded-xl transition-all duration-200 ${activeView === "dashboard"
-                                    ? "bg-blue-100 text-blue-600 font-medium"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                    }`}
-                            >
-                                Dashboard
-                            </button>
-                            <button
-                                onClick={() => setActiveView("planner")}
-                                className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 ${activeView === "planner"
-                                    ? "bg-blue-100 text-blue-600 font-medium"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                    }`}
-                            >
-                                <CalendarIcon className="w-4 h-4" />
-                                Month Planner
-                            </button>
+    
+                        {/* User Profile and AI Notifications */}
+                        <div className="flex items-center gap-4">
+                            <AINotificationSystem />
+                            <UserProfile user={user} onLogout={handleLogout} />
                         </div>
                     </div>
-
-                    {/* Add Month Selector when in planner view */}
-                    {activeView === "planner" && (
-                        <div className="mt-4 flex justify-end">
-                            <input
-                                type="month"
-                                value={selectedMonthPlan}
-                                onChange={(e) => setSelectedMonthPlan(e.target.value)}
-                                className="px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                    )}
+    
+                    {/* Navigation Tabs */}
+                    <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                            onClick={() => setActiveView("dashboard")}
+                            className={`px-4 py-2 rounded-xl transition-all duration-200 ${activeView === "dashboard"
+                                ? "bg-blue-100 text-blue-600 font-medium"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                        >
+                            Dashboard
+                        </button>
+                        <button
+                            onClick={() => setActiveView("planner")}
+                            className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 ${activeView === "planner"
+                                ? "bg-blue-100 text-blue-600 font-medium"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                        >
+                            <Calendar className="w-4 h-4" />
+                            Month Planner
+                        </button>
+                        <button
+                            onClick={() => setActiveView("family")}
+                            className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 ${activeView === "family"
+                                ? "bg-blue-100 text-blue-600 font-medium"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                        >
+                            <Users className="w-4 h-4" />
+                            Family
+                        </button>
+                        <button
+                            onClick={() => setActiveView("reports")}
+                            className={`px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 ${activeView === "reports"
+                                ? "bg-blue-100 text-blue-600 font-medium"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                }`}
+                        >
+                            <FileText className="w-4 h-4" />
+                            Reports
+                        </button>
+                    </div>
                 </div>
-                {activeView === "dashboard" ? (
+    
+                {/* Conditional Content Based on Active View */}
+                {activeView === "dashboard" && (
                     <>
                         {/* Summary Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Balance Card */}
                             <div
                                 className="group bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                        hover:shadow-lg transition-all duration-300 cursor-pointer
-                        relative overflow-hidden"
+                            hover:shadow-lg transition-all duration-300 cursor-pointer
+                            relative overflow-hidden"
                             >
                                 <div
                                     className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent 
-                           opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                               opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                                 />
                                 <div className="relative">
                                     <div className="flex items-center justify-between mb-4">
@@ -697,16 +708,16 @@ const FinanceManager = () => {
                                     <p className="text-sm text-gray-500">Current Balance</p>
                                 </div>
                             </div>
-
+    
                             {/* Income Card */}
                             <div
                                 className="group bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                        hover:shadow-lg transition-all duration-300 cursor-pointer
-                        relative overflow-hidden"
+                            hover:shadow-lg transition-all duration-300 cursor-pointer
+                            relative overflow-hidden"
                             >
                                 <div
                                     className="absolute inset-0 bg-gradient-to-br from-green-50 to-transparent 
-                           opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                               opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                                 />
                                 <div className="relative">
                                     <div className="flex items-center justify-between mb-4">
@@ -723,16 +734,16 @@ const FinanceManager = () => {
                                     <p className="text-sm text-gray-500">Total Income</p>
                                 </div>
                             </div>
-
+    
                             {/* Expense Card */}
                             <div
                                 className="group bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                        hover:shadow-lg transition-all duration-300 cursor-pointer
-                        relative overflow-hidden"
+                            hover:shadow-lg transition-all duration-300 cursor-pointer
+                            relative overflow-hidden"
                             >
                                 <div
                                     className="absolute inset-0 bg-gradient-to-br from-red-50 to-transparent 
-                           opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                               opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                                 />
                                 <div className="relative">
                                     <div className="flex items-center justify-between mb-4">
@@ -750,13 +761,16 @@ const FinanceManager = () => {
                                 </div>
                             </div>
                         </div>
-
+    
+                        {/* AI Insights Panel */}
+                        <AIInsightsPanel transactions={transactions} />
+    
                         {/* Charts Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Category Distribution */}
                             <div
                                 className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                         hover:shadow-lg transition-all duration-300"
+                             hover:shadow-lg transition-all duration-300"
                             >
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-lg font-semibold text-gray-800">
@@ -807,11 +821,11 @@ const FinanceManager = () => {
                                     </ResponsiveContainer>
                                 </div>
                             </div>
-
+    
                             {/* Timeline Chart */}
                             <div
                                 className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                         hover:shadow-lg transition-all duration-300"
+                             hover:shadow-lg transition-all duration-300"
                             >
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-lg font-semibold text-gray-800">
@@ -868,339 +882,9 @@ const FinanceManager = () => {
                                     </ResponsiveContainer>
                                 </div>
                             </div>
-
-                            {/* Family Expenses */}
-                            <div
-                                className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                         hover:shadow-lg transition-all duration-300"
-                            >
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-lg font-semibold text-gray-800">
-                                        Family Summary
-                                    </h3>
-                                    <div className="p-2 bg-amber-100 rounded-xl">
-                                        <Users className="w-5 h-5 text-amber-600" />
-                                    </div>
-                                </div>
-                                <div className="h-80">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={prepareFamilyData} layout="vertical">
-                                            <CartesianGrid
-                                                strokeDasharray="3 3"
-                                                stroke="#f0f0f0"
-                                                horizontal={false}
-                                            />
-                                            <XAxis
-                                                type="number"
-                                                tickFormatter={(value) => formatCurrency(value)}
-                                            />
-                                            <YAxis
-                                                dataKey="name"
-                                                type="category"
-                                                width={100}
-                                                tick={({ x, y, payload }) => (
-                                                    <g transform={`translate(${x},${y})`}>
-                                                        <text
-                                                            x={-10}
-                                                            y={0}
-                                                            dy={4}
-                                                            textAnchor="end"
-                                                            fill="#666"
-                                                        >
-                                                            {payload.value}{" "}
-                                                            {
-                                                                familyMembers.find(
-                                                                    (m) => m.name === payload.value
-                                                                )?.icon
-                                                            }
-                                                        </text>
-                                                    </g>
-                                                )}
-                                            />
-                                            <Tooltip
-                                                formatter={(value) => formatCurrency(value)}
-                                                contentStyle={{
-                                                    backgroundColor: "rgba(255, 255, 255, 0.95)",
-                                                    borderRadius: "12px",
-                                                    padding: "8px",
-                                                    border: "1px solid #e5e7eb",
-                                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                                }}
-                                            />
-                                            <Legend />
-                                            <Bar
-                                                dataKey="expenses"
-                                                name="Expenses"
-                                                fill={chartColors.expense}
-                                                radius={[0, 4, 4, 0]}
-                                            />
-                                            <Bar
-                                                dataKey="income"
-                                                name="Income"
-                                                fill={chartColors.income}
-                                                radius={[0, 4, 4, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                            {/* Daily Average Spending */}
-                            <div
-                                className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100
-                       hover:shadow-lg transition-all duration-300"
-                            >
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-lg font-semibold text-gray-800">
-                                        Daily Patterns
-                                    </h3>
-                                    <div className="p-2 bg-indigo-100 rounded-xl">
-                                        <Calendar className="w-5 h-5 text-indigo-600" />
-                                    </div>
-                                </div>
-                                <div className="h-80">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={prepareDailyAverages}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                            <XAxis dataKey="day" stroke="#9ca3af" />
-                                            <YAxis
-                                                tickFormatter={(value) => formatCurrency(value)}
-                                                stroke="#9ca3af"
-                                            />
-                                            <Tooltip
-                                                formatter={(value) => formatCurrency(value)}
-                                                contentStyle={{
-                                                    backgroundColor: "rgba(255, 255, 255, 0.95)",
-                                                    borderRadius: "12px",
-                                                    padding: "8px",
-                                                    border: "1px solid #e5e7eb",
-                                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                                }}
-                                            />
-                                            <Legend />
-                                            <Bar
-                                                dataKey="average"
-                                                name="Average Spending"
-                                                fill={chartColors.primary}
-                                                radius={[4, 4, 0, 0]}
-                                            />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
                         </div>
-
-                        {/* Add Transaction Modal */}
-                        {showAddModal && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                                <div className="bg-white rounded-2xl p-6 w-full max-w-md relative">
-                                    <div className="absolute top-4 right-4">
-                                        <button
-                                            onClick={() => setShowAddModal(false)}
-                                            className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
-                                        >
-                                            <X className="w-5 h-5 text-gray-500" />
-                                        </button>
-                                    </div>
-
-                                    <h2 className="text-xl font-semibold mb-6">
-                                        Add Transaction
-                                    </h2>
-
-                                    <div className="space-y-4">
-                                        {/* Transaction Type */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Type
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button
-                                                    className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
-                              transition-all duration-200 ${newTransaction.type ===
-                                                            TRANSACTION_TYPES.EXPENSE
-                                                            ? "bg-red-100 text-red-600 border-2 border-red-200"
-                                                            : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
-                                                        }`}
-                                                    onClick={() =>
-                                                        setNewTransaction((prev) => ({
-                                                            ...prev,
-                                                            type: TRANSACTION_TYPES.EXPENSE,
-                                                            category: "",
-                                                        }))
-                                                    }
-                                                >
-                                                    <PieChartIcon className="w-4 h-4" />
-                                                    Expense
-                                                </button>
-                                                <button
-                                                    className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
-                              transition-all duration-200 ${newTransaction.type === TRANSACTION_TYPES.INCOME
-                                                            ? "bg-green-100 text-green-600 border-2 border-green-200"
-                                                            : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
-                                                        }`}
-                                                    onClick={() =>
-                                                        setNewTransaction((prev) => ({
-                                                            ...prev,
-                                                            type: TRANSACTION_TYPES.INCOME,
-                                                            category: "",
-                                                        }))
-                                                    }
-                                                >
-                                                    <TrendingUp className="w-4 h-4" />
-                                                    Income
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Amount */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Amount
-                                            </label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                                                    $
-                                                </span>
-                                                <input
-                                                    type="number"
-                                                    className="w-full pl-8 pr-4 py-2 rounded-xl border border-gray-200 
-                             focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                             transition-all duration-200"
-                                                    value={newTransaction.amount}
-                                                    onChange={(e) =>
-                                                        setNewTransaction({
-                                                            ...newTransaction,
-                                                            amount: e.target.value,
-                                                        })
-                                                    }
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Category */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Category
-                                            </label>
-                                            <select
-                                                className="w-full px-4 py-2 rounded-xl border border-gray-200
-                           focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                           transition-all duration-200"
-                                                value={newTransaction.category}
-                                                onChange={(e) =>
-                                                    setNewTransaction({
-                                                        ...newTransaction,
-                                                        category: e.target.value,
-                                                    })
-                                                }
-                                            >
-                                                <option value="">Select category</option>
-                                                {Object.entries(
-                                                    newTransaction.type === TRANSACTION_TYPES.INCOME
-                                                        ? incomeCategories
-                                                        : categories
-                                                ).map(([name, cat]) => (
-                                                    <option key={name} value={name}>
-                                                        {cat.icon} {name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* Family Member */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Family Member
-                                            </label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {familyMembers.map((member) => (
-                                                    <button
-                                                        key={member.id}
-                                                        className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
-                                transition-all duration-200 ${newTransaction.familyMember === member.name
-                                                                ? "bg-blue-100 text-blue-600 border-2 border-blue-200"
-                                                                : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
-                                                            }`}
-                                                        onClick={() =>
-                                                            setNewTransaction((prev) => ({
-                                                                ...prev,
-                                                                familyMember: member.name,
-                                                            }))
-                                                        }
-                                                    >
-                                                        <span>{member.icon}</span>
-                                                        <span>{member.name}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Description */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Description
-                                            </label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-4 py-2 rounded-xl border border-gray-200
-                           focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                           transition-all duration-200"
-                                                value={newTransaction.description}
-                                                onChange={(e) =>
-                                                    setNewTransaction({
-                                                        ...newTransaction,
-                                                        description: e.target.value,
-                                                    })
-                                                }
-                                                placeholder="Add a description"
-                                            />
-                                        </div>
-
-                                        {/* Date */}
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Date
-                                            </label>
-                                            <input
-                                                type="date"
-                                                className="w-full px-4 py-2 rounded-xl border border-gray-200
-                           focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                           transition-all duration-200"
-                                                value={newTransaction.date}
-                                                onChange={(e) =>
-                                                    setNewTransaction({
-                                                        ...newTransaction,
-                                                        date: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="flex gap-4 mt-6">
-                                            <button
-                                                className="flex-1 px-6 py-2 bg-blue-500 text-white rounded-xl
-                           hover:bg-blue-600 transition-colors duration-200
-                           focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                                                onClick={handleAddTransaction}
-                                            >
-                                                Add Transaction
-                                            </button>
-                                            <button
-                                                className="flex-1 px-6 py-2 bg-gray-100 text-gray-700 rounded-xl
-                           hover:bg-gray-200 transition-colors duration-200"
-                                                onClick={() => setShowAddModal(false)}
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Transaction List Section */}
-                        {/* Transaction List Section */}
+    
+                        {/* Transaction List */}
                         <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                             <div className="flex flex-col gap-4 mb-6">
                                 {/* Header and Filters */}
@@ -1208,7 +892,7 @@ const FinanceManager = () => {
                                     <h3 className="text-lg font-semibold text-gray-800">
                                         Transaction History
                                     </h3>
-
+    
                                     {/* Transaction Type Filter */}
                                     <div className="flex gap-2">
                                         <button
@@ -1240,7 +924,7 @@ const FinanceManager = () => {
                                         </button>
                                     </div>
                                 </div>
-
+    
                                 {/* Search and Group Controls */}
                                 <div className="flex flex-wrap gap-4">
                                     {/* Search Bar */}
@@ -1253,19 +937,19 @@ const FinanceManager = () => {
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
                                                 className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 
-                     focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                     transition-all duration-200"
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                         transition-all duration-200"
                                             />
                                         </div>
                                     </div>
-
+    
                                     {/* Grouping Options */}
                                     <select
                                         value={groupingOption}
                                         onChange={(e) => setGroupingOption(e.target.value)}
                                         className="px-4 py-2 rounded-xl border border-gray-200 
-                   focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                   transition-all duration-200"
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       transition-all duration-200"
                                     >
                                         <option value="none">No Grouping</option>
                                         <option value="category">Group by Category</option>
@@ -1274,8 +958,8 @@ const FinanceManager = () => {
                                     </select>
                                 </div>
                             </div>
-
-                            {/* Transaction List */}
+    
+                            {/* Transaction Groups */}
                             <div className="space-y-6">
                                 {groupedTransactions.map((group) => (
                                     <div key={group.title} className="space-y-2">
@@ -1291,7 +975,7 @@ const FinanceManager = () => {
                                                 </span>
                                             </div>
                                         )}
-
+    
                                         {/* Group Transactions */}
                                         <div className="divide-y divide-gray-100">
                                             {group.transactions.map((transaction) => (
@@ -1312,7 +996,7 @@ const FinanceManager = () => {
                                                                     ? incomeCategories[transaction.category]?.icon
                                                                     : categories[transaction.category]?.icon}
                                                             </div>
-
+    
                                                             {/* Transaction Details */}
                                                             <div>
                                                                 <h4 className="font-medium text-gray-900">
@@ -1338,7 +1022,7 @@ const FinanceManager = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-
+    
                                                         <div className="flex items-center gap-4">
                                                             <span
                                                                 className={`font-medium ${transaction.type === TRANSACTION_TYPES.INCOME
@@ -1351,7 +1035,7 @@ const FinanceManager = () => {
                                                                     : "-"}
                                                                 {formatCurrency(transaction.amount)}
                                                             </span>
-
+    
                                                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
                                                                 <button
                                                                     onClick={() =>
@@ -1378,7 +1062,7 @@ const FinanceManager = () => {
                                     </div>
                                 ))}
                             </div>
-
+    
                             {/* Pagination */}
                             <div className="mt-6 flex items-center justify-between">
                                 <div className="text-sm text-gray-500">
@@ -1389,7 +1073,7 @@ const FinanceManager = () => {
                                     )}{" "}
                                     of {filteredTransactions.length} transactions
                                 </div>
-
+    
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() =>
@@ -1397,8 +1081,8 @@ const FinanceManager = () => {
                                         }
                                         disabled={currentPage === 1}
                                         className="px-4 py-2 rounded-xl transition-all duration-200
-                 disabled:opacity-50 disabled:cursor-not-allowed
-                 bg-gray-100 text-gray-600 hover:bg-gray-200"
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     bg-gray-100 text-gray-600 hover:bg-gray-200"
                                     >
                                         Previous
                                     </button>
@@ -1422,8 +1106,8 @@ const FinanceManager = () => {
                                         }
                                         disabled={currentPage === totalPages}
                                         className="px-4 py-2 rounded-xl transition-all duration-200
-                 disabled:opacity-50 disabled:cursor-not-allowed
-                 bg-gray-100 text-gray-600 hover:bg-gray-200"
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     bg-gray-100 text-gray-600 hover:bg-gray-200"
                                     >
                                         Next
                                     </button>
@@ -1431,26 +1115,272 @@ const FinanceManager = () => {
                             </div>
                         </div>
                     </>
-                ) : (
-                    <MonthPlanner
-                        selectedMonth={selectedMonthPlan}
-                        actualTransactions={monthTransactions}
-                        onSavePlan={handleSavePlan}
-                    />
                 )}
-
-                {/* Floating Action Button */}
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-blue-500 
-                   hover:bg-blue-600 text-white shadow-lg flex items-center 
-                   justify-center transition-all duration-200 hover:scale-110"
-                >
-                    <Plus className="w-6 h-6" />
-                </button>
-            </div>
-        </div>
-    );
+    
+                {activeView === "planner" && (
+                    <div>
+                        {/* Month selection input */}
+                        <div className="mb-4 flex justify-end">
+                            <input
+                                type="month"
+                                value={selectedMonthPlan}
+                                onChange={(e) => handleMonthChange(e.target.value)}
+                                className="px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        
+                        {/* Render MonthPlanner with AI Budget Advisor */}
+                        <MonthPlanner
+                            selectedMonth={selectedMonthPlan}
+                            actualTransactions={monthTransactions}
+                            onSavePlan={handleSavePlan}
+                        />
+                    </div>
+                )}
+    
+                {activeView === "family" && (
+                    <FamilyDashboard />
+                )}
+    
+                {activeView === "reports" && (
+                    <div className="space-y-6">
+                        <AIReportGenerator 
+                            startDate={new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]}
+                            endDate={new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]}
+                            transactionData={transactions}
+                        />
+                        <AISavingsPlanner
+                            income={calculateTotal(TRANSACTION_TYPES.INCOME)}
+                            expenses={calculateTotal(TRANSACTION_TYPES.EXPENSE)}
+                        />
+                    </div>
+                )}
+    
+                {/* Add Transaction Modal */}
+                {showAddModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md relative">
+                            <div className="absolute top-4 right-4">
+                                <button
+                                    onClick={() => setShowAddModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                                >
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+    
+                            <h2 className="text-xl font-semibold mb-6">
+                                Add Transaction
+                            </h2>
+    
+                            <div className="space-y-4">
+                                {/* Transaction Type */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Type
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
+                                  transition-all duration-200 ${newTransaction.type ===
+                                                TRANSACTION_TYPES.EXPENSE
+                                                ? "bg-red-100 text-red-600 border-2 border-red-200"
+                                                : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
+                                            }`}
+                                            onClick={() =>
+                                                setNewTransaction((prev) => ({
+                                                    ...prev,
+                                                    type: TRANSACTION_TYPES.EXPENSE,
+                                                    category: "",
+                                                }))
+                                            }
+                                        >
+                                            <PieChartIcon className="w-4 h-4" />
+                                            Expense
+                                        </button>
+                                        <button
+                                            className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
+                                  transition-all duration-200 ${newTransaction.type === TRANSACTION_TYPES.INCOME
+                                                ? "bg-green-100 text-green-600 border-2 border-green-200"
+                                                : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
+                                            }`}
+                                            onClick={() =>
+                                                setNewTransaction((prev) => ({
+                                                    ...prev,
+                                                    type: TRANSACTION_TYPES.INCOME,
+                                                    category: "",
+                                                }))
+                                            }
+                                        >
+                                            <TrendingUp className="w-4 h-4" />
+                                            Income
+                                        </button>
+                                    </div>
+                                </div>
+    
+                                {/* Amount */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Amount
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                            $
+                                        </span>
+                                        <input
+                                            type="number"
+                                            className="w-full pl-8 pr-4 py-2 rounded-xl border border-gray-200 
+                                 focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                 transition-all duration-200"
+                                            value={newTransaction.amount}
+                                            onChange={(e) =>
+                                                setNewTransaction({
+                                                    ...newTransaction,
+                                                    amount: e.target.value,
+                                                })
+                                            }
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+    
+                                {/* Category */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Category
+                                    </label>
+                                    <select
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-200
+                               focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                               transition-all duration-200"
+                                        value={newTransaction.category}
+                                        onChange={(e) =>
+                                            setNewTransaction({
+                                                ...newTransaction,
+                                                category: e.target.value,
+                                            })
+                                        }
+                                    >
+                                        <option value="">Select category</option>
+                                        {Object.entries(
+                                            newTransaction.type === TRANSACTION_TYPES.INCOME
+                                                ? incomeCategories
+                                                : categories
+                                        ).map(([name, cat]) => (
+                                            <option key={name} value={name}>
+                                                {cat.icon} {name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+    
+                                {/* Family Member */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Family Member
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {familyMembers.map((member) => (
+                                            <button
+                                                key={member.id}
+                                                className={`px-4 py-2 rounded-xl flex items-center justify-center gap-2 
+                                                    transition-all duration-200 ${newTransaction.familyMember === member.name
+                                                                        ? "bg-blue-100 text-blue-600 border-2 border-blue-200"
+                                                                        : "bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200"
+                                                                    }`}
+                                                                onClick={() =>
+                                                                    setNewTransaction((prev) => ({
+                                                                        ...prev,
+                                                                        familyMember: member.name,
+                                                                    }))
+                                                                }
+                                                            >
+                                                                <span>{member.icon}</span>
+                                                                <span>{member.name}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                    
+                                                {/* Description */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                        Description
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full px-4 py-2 rounded-xl border border-gray-200
+                                               focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                               transition-all duration-200"
+                                                        value={newTransaction.description}
+                                                        onChange={(e) =>
+                                                            setNewTransaction({
+                                                                ...newTransaction,
+                                                                description: e.target.value,
+                                                            })
+                                                        }
+                                                        placeholder="Add a description"
+                                                    />
+                                                </div>
+                    
+                                                {/* Date */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                        Date
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        className="w-full px-4 py-2 rounded-xl border border-gray-200
+                                               focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                               transition-all duration-200"
+                                                        value={newTransaction.date}
+                                                        onChange={(e) =>
+                                                            setNewTransaction({
+                                                                ...newTransaction,
+                                                                date: e.target.value,
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
+                    
+                                                {/* Action Buttons */}
+                                                <div className="flex gap-4 mt-6">
+                                                    <button
+                                                        className="flex-1 px-6 py-2 bg-blue-500 text-white rounded-xl
+                                               hover:bg-blue-600 transition-colors duration-200
+                                               focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                                        onClick={handleAddTransaction}
+                                                    >
+                                                        Add Transaction
+                                                    </button>
+                                                    <button
+                                                        className="flex-1 px-6 py-2 bg-gray-100 text-gray-700 rounded-xl
+                                               hover:bg-gray-200 transition-colors duration-200"
+                                                        onClick={() => setShowAddModal(false)}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                    
+                                {/* Add AI Chat Component - floating */}
+                                <AIChatComponent />
+                    
+                                {/* Floating Action Button - moved slightly up to avoid overlapping with chat button */}
+                                <button
+                                    onClick={() => setShowAddModal(true)}
+                                    className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-blue-500 
+                                   hover:bg-blue-600 text-white shadow-lg flex items-center 
+                                   justify-center transition-all duration-200 hover:scale-110 z-20"
+                                >
+                                    <Plus className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+                    );
 };
 
 export default FinanceManager;
