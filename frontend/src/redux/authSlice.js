@@ -52,6 +52,36 @@ export const updateUserProfile = createAsyncThunk('auth/updateProfile', async (p
   }
 });
 
+// Thunk for getting family members
+export const getFamilyMembers = createAsyncThunk('auth/getFamilyMembers', async (_, { rejectWithValue }) => {
+  try {
+    const response = await api.get('/family/members');
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to fetch family members');
+  }
+});
+
+// Thunk for inviting family member
+export const inviteFamilyMember = createAsyncThunk('auth/inviteFamilyMember', async (email, { rejectWithValue }) => {
+  try {
+    const response = await api.post('/family/invite', { email });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to invite family member');
+  }
+});
+
+// Thunk for removing family member
+export const removeFamilyMember = createAsyncThunk('auth/removeFamilyMember', async (memberId, { rejectWithValue }) => {
+  try {
+    const response = await api.delete(`/family/members/${memberId}`);
+    return { memberId, ...response.data };
+  } catch (error) {
+    return rejectWithValue(error.response?.data?.message || 'Failed to remove family member');
+  }
+});
+
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -61,6 +91,11 @@ const authSlice = createSlice({
     error: null,
     isAuthenticated: !!localStorage.getItem('token'),
     profile: null,
+    family: {
+      members: [],
+      isLoading: false,
+      error: null
+    }
   },
   reducers: {
     logout: (state) => {
@@ -69,11 +104,17 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       state.profile = null;
+      state.family = {
+        members: [],
+        isLoading: false,
+        error: null
+      };
       localStorage.removeItem('token');
       delete api.defaults.headers.common['Authorization'];
     },
     clearError: (state) => {
       state.error = null;
+      state.family.error = null;
     },
     setProfile: (state, action) => {
       state.profile = action.payload;
@@ -138,6 +179,48 @@ const authSlice = createSlice({
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+      })
+      // Family Members
+      .addCase(getFamilyMembers.pending, (state) => {
+        state.family.isLoading = true;
+        state.family.error = null;
+      })
+      .addCase(getFamilyMembers.fulfilled, (state, action) => {
+        state.family.isLoading = false;
+        state.family.members = action.payload;
+        state.family.error = null;
+      })
+      .addCase(getFamilyMembers.rejected, (state, action) => {
+        state.family.isLoading = false;
+        state.family.error = action.payload;
+      })
+      // Invite Family Member
+      .addCase(inviteFamilyMember.pending, (state) => {
+        state.family.isLoading = true;
+        state.family.error = null;
+      })
+      .addCase(inviteFamilyMember.fulfilled, (state, action) => {
+        state.family.isLoading = false;
+        state.family.members.push(action.payload);
+        state.family.error = null;
+      })
+      .addCase(inviteFamilyMember.rejected, (state, action) => {
+        state.family.isLoading = false;
+        state.family.error = action.payload;
+      })
+      // Remove Family Member
+      .addCase(removeFamilyMember.pending, (state) => {
+        state.family.isLoading = true;
+        state.family.error = null;
+      })
+      .addCase(removeFamilyMember.fulfilled, (state, action) => {
+        state.family.isLoading = false;
+        state.family.members = state.family.members.filter(member => member.id !== action.payload.memberId);
+        state.family.error = null;
+      })
+      .addCase(removeFamilyMember.rejected, (state, action) => {
+        state.family.isLoading = false;
+        state.family.error = action.payload;
       });
   },
 });

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Bot } from 'lucide-react';
-import api from '../../services/api';;
+import { MessageSquare, X, Send, Bot, Users } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import api from '../../services/api';
 
 const AIChatComponent = () => {
+    const { family } = useSelector(state => state.auth);
     const [showChat, setShowChat] = useState(false);
     const [messages, setMessages] = useState([
         { role: 'assistant', content: 'Hi! I\'m your finance AI assistant. Ask me anything about your finances!' }
@@ -28,7 +30,9 @@ const AIChatComponent = () => {
         try {
             const response = await api.post('/ai/chat', {
                 message: inputValue,
-                messageHistory: messages.slice(-10) // Send last 10 messages for context
+                messageHistory: messages.slice(-10), // Send last 10 messages for context
+                familyId: family.id,
+                familyMembers: family.members
             });
 
             setMessages(prev => [...prev, { role: 'assistant', content: response.data.response }]);

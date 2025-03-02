@@ -117,11 +117,44 @@ const categoriesApi = {
   deleteCategory: (id) => api.delete(`/categories/${id}`),
 };
 
+// AI-related API calls
+const aiApi = {
+  // Chat with AI
+  chat: (message) => api.post('/ai/chat', { message }),
+  
+  // Get AI insights
+  getInsights: (transactions) => api.post('/ai/analyze', { transactions }),
+  
+  // Get budget recommendations
+  getBudgetRecommendations: (currentBudget, monthlyIncome) => 
+    api.post('/ai/budget/recommendations', { currentBudget, monthlyIncome }),
+  
+  // Generate AI report
+  generateReport: (startDate, endDate) => 
+    api.post('/ai/generate-report', { startDate, endDate }),
+  
+  // Get savings plan
+  getSavingsPlan: (goal, targetDate = null) => 
+    api.post('/ai/savings-plan', { goal, targetDate }),
+  
+  // Optimize family budget
+  optimizeFamilyBudget: (familyMembers, totalBudget) => 
+    api.post('/ai/family/optimize-budget', { familyMembers, totalBudget }),
+  
+  // Get AI notifications
+  getNotifications: () => api.get('/ai/notifications'),
+  
+  // Mark notification as read
+  markNotificationRead: (notificationId) => 
+    api.put(`/ai/notifications/${notificationId}/read`)
+};
+
 // Extend the api object with the new endpoints
 Object.assign(api, {
   family: familyApi,
   user: userApi,
   categories: categoriesApi,
+  ai: aiApi
 });
 
 // Initialize headers if token exists

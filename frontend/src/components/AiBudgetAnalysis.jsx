@@ -1,7 +1,8 @@
 /* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Lightbulb, TrendingUp, PieChart, RefreshCcw, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Lightbulb, TrendingUp, PieChart, RefreshCcw, MessageSquare, Users } from 'lucide-react';
+import { useSelector } from 'react-redux';
 import api from '../services/api';
 
 const AiBudgetAnalysis = ({ transactions, monthlyPlan }) => {
@@ -11,6 +12,7 @@ const AiBudgetAnalysis = ({ transactions, monthlyPlan }) => {
     const [chatQuestion, setChatQuestion] = useState('');
     const [chatResponse, setChatResponse] = useState(null);
     const [chatLoading, setChatLoading] = useState(false);
+    const { family } = useSelector(state => state.auth);
 
     // Insight type configurations
     const insightTypes = {
@@ -54,7 +56,9 @@ const AiBudgetAnalysis = ({ transactions, monthlyPlan }) => {
         try {
             const response = await api.post('/ai/analyze', {
                 transactions,
-                monthlyPlan
+                monthlyPlan,
+                familyId: family.id,
+                familyMembers: family.members
             });
             setInsights(response.data.insights);
         } catch (err) {

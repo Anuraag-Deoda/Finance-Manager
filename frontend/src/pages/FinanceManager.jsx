@@ -23,6 +23,7 @@ import AINotificationSystem from "../components/ai/AINotificationSystem.jsx";
 import AIReportGenerator from "../components/ai/AIReportGenerator.jsx";
 import AIFamilyBudgetOptimizer from "../components/ai/AIFamilyBudgetOptimizer.jsx";
 import AISavingsPlanner from "../components/ai/AISavingsPlanner.jsx";
+import FamilyDashboard from "../components/FamilyDashboard.jsx";
 
 const FinanceManager = () => {
     // Core state management
