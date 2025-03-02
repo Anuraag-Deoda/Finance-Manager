@@ -1,6 +1,6 @@
 # Family Finance Manager
 
-A comprehensive family finance tracking application built with React and modern web technologies. Track expenses, incomes, and plan monthly budgets for your entire family.
+A comprehensive family finance tracking application built with React (frontend) and Flask (backend). Track expenses, incomes, and plan monthly budgets for your entire family.
 
 ## Features
 
@@ -10,8 +10,16 @@ A comprehensive family finance tracking application built with React and modern 
   - Family member association
   - Recurring transaction support
   - Detailed transaction history
+  - AI-powered transaction categorization
 
-### 2. Dashboard Visualizations
+### 2. User Management
+- **Family System**
+  - Create and manage family groups
+  - Invite family members
+  - Role-based access control
+  - Profile management with image upload
+
+### 3. Dashboard Visualizations
 - **Income vs Expenses Timeline**
   - Interactive line charts using Recharts
   - Daily, weekly, monthly, and yearly views
@@ -28,7 +36,7 @@ A comprehensive family finance tracking application built with React and modern 
   - Average spending by day of week
   - Spending trend analysis
 
-### 3. Monthly Budget Planner
+### 4. Monthly Budget Planner
 - **Budget Setting**
   - Expected income and expense planning
   - Category-wise budget allocation
@@ -39,7 +47,7 @@ A comprehensive family finance tracking application built with React and modern 
   - Visual progress indicators
   - Variance analysis
 
-### 4. Data Management
+### 5. Data Management
 - **Filtering & Search**
   - Multi-criteria search
   - Date range filtering
@@ -52,79 +60,114 @@ A comprehensive family finance tracking application built with React and modern 
 
 ## Technologies Used
 
-### Frontend Framework
-- React 18.2.0
-- Vite.js (build tool)
+### Frontend
+- **Framework**
+  - React 18.2.0
+  - Vite.js (build tool)
 
-### UI Components & Styling
-- TailwindCSS - Utility-first CSS framework
-- Lucide React - Icon library
-- Custom components with modern design principles
+- **UI Components & Styling**
+  - TailwindCSS
+  - Lucide React (icons)
+  - Custom components
 
-### Data Visualization
-- Recharts - Composable charting library
-  - Line Charts
-  - Bar Charts
-  - Pie Charts
-  - Composed Charts
+- **State Management**
+  - React Hooks
+  - Context API
+  - Local Storage
 
-### State Management
-- React Hooks
-- Context API for global state
-- Local Storage for data persistence
+- **Data Visualization**
+  - Recharts library
 
-### Data Processing
-- Memoized calculations using useMemo
-- Date manipulation
-- Number formatting
+### Backend
+- **Framework**
+  - Flask
+  - SQLAlchemy (ORM)
+  - Flask-JWT-Extended (Authentication)
+  - Flask-Mail (Email notifications)
+
+- **Database**
+  - SQLite (development)
+  - PostgreSQL (production)
+
+- **AI Integration**
+  - Custom AI routes for transaction analysis
+  - Category prediction
 
 ## Project Structure
 
+### Frontend
 ```
-src/
-├── components/
-│   ├── FinanceManager.jsx    # Main component
-│   ├── MonthPlanner.jsx      # Budget planning
-│   ├── Login.jsx             # Authentication
-│   └── Register.jsx          # User registration
-├── utils/
-│   └── constants.js          # Configuration & constants
-├── services/
-│   └── api.js               # API service layer
-├── contexts/
-│   └── AuthContext.jsx      # Authentication context
-└── App.jsx                  # Root component
+frontend/
+├── src/
+│   ├── components/          # Reusable UI components
+│   ├── pages/              # Main application pages
+│   ├── redux/              # State management
+│   ├── services/           # API services
+│   └── utils/              # Helper functions
+├── public/                 # Static assets
+└── package.json           # Dependencies
 ```
 
-## Development Process
+### Backend
+```
+backend/
+├── ai/                    # AI-related functionality
+├── routes/                # API route handlers
+├── static/               # Static files & uploads
+├── app.py               # Main application file
+├── config.py            # Configuration
+├── models.py            # Database models
+└── requirements.txt     # Python dependencies
+```
 
-### Phase 1: Core Setup
-1. Project initialization with Vite
-2. TailwindCSS setup and configuration
-3. Basic component structure
+## Setup Instructions
 
-### Phase 2: Features Implementation
-1. Transaction management
-2. Data visualization
-3. Monthly planning
-4. Search and filtering
+### Prerequisites
+- Python 3.8+
+- Node.js 16+
+- npm or yarn
+- Git
 
-### Phase 3: UI/UX Refinement
-1. Responsive design
-2. Interactive animations
-3. Error handling
-4. Loading states
-
-## Getting Started
-
-1. Clone the repository
+### Backend Setup
+1. Create and activate virtual environment
 ```bash
-git clone <repository-url>
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. Install dependencies
 ```bash
+cd backend
+pip install -r requirements.txt
+```
+
+3. Set up environment variables
+```bash
+cp .env.template .env
+# Edit .env with your configurations
+```
+
+4. Initialize database
+```bash
+flask db upgrade
+```
+
+5. Run development server
+```bash
+flask run
+```
+
+### Frontend Setup
+1. Install dependencies
+```bash
+cd frontend
 npm install
+```
+
+2. Set up environment variables
+```bash
+cp .env.example .env
+# Edit .env with your configurations
 ```
 
 3. Run development server
@@ -132,101 +175,48 @@ npm install
 npm run dev
 ```
 
-4. Build for production
-```bash
-npm run build
-```
+## API Endpoints
 
-## Design Decisions
+### Authentication
+- POST `/api/auth/register` - User registration
+- POST `/api/auth/login` - User login
+- POST `/api/auth/logout` - User logout
 
-### 1. Component Architecture
-- Modular components for maintainability
-- Separation of concerns between data and presentation
-- Reusable utility functions
+### User Management
+- GET `/api/user/profile` - Get user profile
+- PUT `/api/user/profile` - Update user profile
+- POST `/api/user/profile/image` - Upload profile image
 
-### 2. State Management
-- Component-level state for UI interactions
-- Context for global state (auth, theme)
-- Local storage for data persistence
+### Family Management
+- POST `/api/family/create` - Create new family
+- POST `/api/family/invite` - Invite member
+- POST `/api/family/join` - Join family
+- GET `/api/family/members` - List family members
 
-### 3. Performance Optimization
-- Memoized calculations
-- Lazy loading of components
-- Efficient re-rendering strategies
+### Transactions
+- GET `/api/transactions` - List transactions
+- POST `/api/transactions` - Add transaction
+- PUT `/api/transactions/<id>` - Update transaction
+- DELETE `/api/transactions/<id>` - Delete transaction
 
-## Key Features Implementation
+### Monthly Plans
+- GET `/api/monthly-plans/<month>` - Get monthly plan
+- POST `/api/monthly-plans/<month>` - Save monthly plan
 
-### Transaction Management
-```javascript
-const handleAddTransaction = async () => {
-  // Validation
-  const errors = validateTransaction(newTransaction);
-  if (Object.keys(errors).length > 0) return;
+### Categories
+- GET `/api/categories` - List categories
+- POST `/api/categories` - Add category
+- PUT `/api/categories/<id>` - Update category
+- DELETE `/api/categories/<id>` - Delete category
 
-  // Processing
-  const transactionToAdd = {
-    ...newTransaction,
-    id: Date.now(),
-    amount: parseFloat(newTransaction.amount),
-  };
+## Contributing
 
-  // State update
-  setTransactions(prev => [...prev, transactionToAdd]);
-};
-```
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
-### Data Visualization
-```javascript
-const prepareCategoryData = useMemo(() => {
-  const categoryTotals = {};
-  getFilteredTransactions
-    .filter(t => t.type === TRANSACTION_TYPES.EXPENSE)
-    .forEach(t => {
-      categoryTotals[t.category] = 
-        (categoryTotals[t.category] || 0) + parseFloat(t.amount);
-    });
+## License
 
-  return Object.entries(categoryTotals)
-    .map(([name, value]) => ({
-      name,
-      value,
-      color: categories[name]?.primary || "#8E8E93",
-    }));
-}, [getFilteredTransactions]);
-```
-
-### Budget Planning
-```javascript
-const calculateTotals = useMemo(() => {
-  const expected = {
-    income: monthPlan.expectedIncome.reduce((sum, item) => 
-      sum + parseFloat(item.amount), 0),
-    expenses: monthPlan.expectedExpenses.reduce((sum, item) => 
-      sum + parseFloat(item.amount), 0)
-  };
-  
-  return { expected, actual, variance };
-}, [monthPlan, actualTransactions]);
-```
-
-## Future Improvements
-
-1. **Enhanced Features**
-   - Multi-currency support
-   - Receipt scanning
-   - Export functionality
-   - Advanced reports
-
-2. **Technical Improvements**
-   - Unit testing implementation
-   - Performance optimization
-   - PWA capabilities
-   - Offline support
-
-3. **UI/UX Enhancements**
-   - Dark mode
-   - Custom themes
-   - More visualization options
-   - Mobile responsiveness improvements 
-   
-#Finance-Manager
+This project is licensed under the MIT License - see the LICENSE file for details.
