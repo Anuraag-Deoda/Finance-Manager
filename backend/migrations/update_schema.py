@@ -1,24 +1,30 @@
-from flask import Flask
-from models import db, User, Family, FamilyMember, Category, Transaction, MonthlyPlan
+import sys
 import os
+
+# Add the parent directory to the Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from models import db, User, Family, FamilyMember, Category, Transaction, MonthlyPlan
+from flask import Flask
+from config import Config
 
 def create_app():
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance_tracker.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config.from_object(Config)
     db.init_app(app)
     return app
 
 def update_schema():
     app = create_app()
     with app.app_context():
-        # Drop existing tables
+        # Drop all tables
         db.drop_all()
-        
-        # Create new tables with updated schema
+        print("Dropped all existing tables")
+
+        # Create all tables with the new schema
         db.create_all()
-        
-        print("Database schema updated successfully!")
+        print("Created all tables with the new schema")
 
 if __name__ == '__main__':
-    update_schema() 
+    update_schema()
+    print("Database schema update completed successfully!") 

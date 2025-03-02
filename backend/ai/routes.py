@@ -159,11 +159,27 @@ def ai_savings_plan():
     
     if not data or 'goal' not in data:
         return jsonify({'error': 'Savings goal is required'}), 400
+        
+    try:
+        # Extract and validate goal amount
+        goal_amount = float(data['goal'].get('amount', 0) if isinstance(data['goal'], dict) else data['goal'])
+        if goal_amount <= 0:
+            return jsonify({'error': 'Goal amount must be greater than 0'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid goal amount format'}), 400
     
     # Get user's current financial state
     monthly_plan = MonthlyPlan.query.filter_by(user_id=user_id).first()
     if not monthly_plan:
         return jsonify({'error': 'Monthly plan not found'}), 404
+    
+    # Calculate total income and savings from expected_income list
+    try:
+        total_income = sum(float(entry['amount']) for entry in monthly_plan.expected_income)
+        savings = sum(float(entry['amount']) for entry in monthly_plan.expected_income 
+                     if entry['category'].lower() in ['savings', 'investments', 'emergency fund'])
+    except (KeyError, ValueError, TypeError):
+        return jsonify({'error': 'Invalid income/savings data format in monthly plan'}), 500
     
     # Calculate current monthly expenses
     current_month_start = datetime.now().replace(day=1)
@@ -185,13 +201,16 @@ def ai_savings_plan():
     current_month_expenses = sum(t.amount for t in expenses_query.all())
     target_date = datetime.strptime(data.get('targetDate'), '%Y-%m-%d') if data.get('targetDate') else None
     
-    plan = ai_service.generate_savings_plan(
-        goal_amount=data['goal'],
-        current_savings=monthly_plan.expected_income.get('savings', 0),
-        monthly_income=monthly_plan.expected_income.get('total', 0),
-        monthly_expenses=current_month_expenses,
-        target_date=target_date
-    )
+    try:
+        plan = ai_service.generate_savings_plan(
+            goal_amount=goal_amount,
+            current_savings=savings,
+            monthly_income=total_income,
+            monthly_expenses=current_month_expenses,
+            target_date=target_date
+        )
+    except Exception as e:
+        return jsonify({'error': f'Error generating savings plan: {str(e)}'}), 500
     
     return jsonify({
         'plan': plan

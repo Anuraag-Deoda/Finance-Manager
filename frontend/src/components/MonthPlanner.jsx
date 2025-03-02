@@ -36,8 +36,15 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
     expectedIncome: [],
     expectedExpenses: [],
     notes: "",
+    isFamilyPlan: false
   });
   const [loading, setLoading] = useState(false);
+  const [operationLoading, setOperationLoading] = useState({
+    addIncome: false,
+    addExpense: false,
+    removeEntry: false,
+    saveNotes: false
+  });
   const [error, setError] = useState(null);
   const [showAddIncome, setShowAddIncome] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -45,36 +52,58 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
     category: "",
     amount: "",
     description: "",
-    familyMember: "",
+    familyMember: ""
   });
 
-  // Fetch Monthly Plan from Backend
+  // Fetch Monthly Plan from Backend with retry logic
   useEffect(() => {
+    let retries = 0;
+    const maxRetries = 3;
+
     const fetchMonthPlan = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get(`/monthly-plans/${selectedMonth}`);
+        const response = await api.monthlyPlans.getMonthlyPlan(selectedMonth);
+        const isFamilyPlan = api.monthlyPlans.isFamilyPlan(response);
+        
+        // Validate response data
+        api.monthlyPlans.validatePlanData(response.data);
+        
         setMonthPlan({
           expectedIncome: response.data.expectedIncome || [],
           expectedExpenses: response.data.expectedExpenses || [],
           notes: response.data.notes || "",
+          isFamilyPlan
         });
       } catch (err) {
-        const errorMessage =
-          err.response?.data?.message || "Failed to load monthly plan. Please try again.";
-        setError(errorMessage);
         console.error("Error fetching plan:", err);
-        // Set default plan if not found
-        if (err.response?.status === 404) {
-          setMonthPlan({ expectedIncome: [], expectedExpenses: [], notes: "" });
+        const errorMessage = err.response?.data?.message || "Failed to load monthly plan.";
+        
+        // Implement retry logic
+        if (retries < maxRetries) {
+          console.log(`Retrying fetch (attempt ${retries + 1})...`);
+          retries++;
+          setTimeout(() => fetchMonthPlan(), 1000 * retries); // Exponential backoff
+        } else {
+          setError(`${errorMessage} Please try again later.`);
+          // Set default plan if not found
+          if (err.response?.status === 404) {
+            setMonthPlan({ 
+              expectedIncome: [], 
+              expectedExpenses: [], 
+              notes: "",
+              isFamilyPlan: false
+            });
+          }
         }
       } finally {
         setLoading(false);
       }
     };
+
     fetchMonthPlan();
-  }, [selectedMonth]);
+  }, [selectedMonth]); // Remove retryCount from dependencies
 
   // Utility Function
   const formatCurrency = (amount) => {
@@ -88,84 +117,111 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
 
   // Handlers
   const handleAddEntry = async (type) => {
-    if (!newEntry.category || !newEntry.amount || !newEntry.familyMember) {
-      setError("Please fill all required fields: category, amount, and family member.");
-      return;
-    }
-
-    const amount = parseFloat(newEntry.amount);
-    if (isNaN(amount) || amount <= 0) {
-      setError("Amount must be a positive number.");
-      return;
-    }
-
-    const updatedEntry = { ...newEntry, id: Date.now(), amount };
-    let updatedPlan;
-
-    if (type === TRANSACTION_TYPES.INCOME) {
-      updatedPlan = {
-        ...monthPlan,
-        expectedIncome: [...monthPlan.expectedIncome, updatedEntry],
-      };
-      setShowAddIncome(false);
-    } else {
-      updatedPlan = {
-        ...monthPlan,
-        expectedExpenses: [...monthPlan.expectedExpenses, updatedEntry],
-      };
-      setShowAddExpense(false);
-    }
-
-    setMonthPlan(updatedPlan);
-    setNewEntry({ category: "", amount: "", description: "", familyMember: "" });
+    const operationType = type === TRANSACTION_TYPES.INCOME ? 'addIncome' : 'addExpense';
+    setOperationLoading(prev => ({ ...prev, [operationType]: true }));
     setError(null);
 
     try {
-      await onSavePlan({ month: selectedMonth, ...updatedPlan });
+      if (!newEntry.category || !newEntry.amount || (monthPlan.isFamilyPlan && !newEntry.familyMember)) {
+        throw new Error(
+          monthPlan.isFamilyPlan
+            ? "Please fill all required fields: category, amount, and family member."
+            : "Please fill all required fields: category and amount."
+        );
+      }
+
+      const amount = parseFloat(newEntry.amount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error("Amount must be a positive number.");
+      }
+
+      const updatedEntry = { 
+        ...newEntry, 
+        id: Date.now(), 
+        amount,
+        ...(monthPlan.isFamilyPlan ? {} : { familyMember: undefined })
+      };
+
+      let updatedPlan;
+      if (type === TRANSACTION_TYPES.INCOME) {
+        updatedPlan = {
+          ...monthPlan,
+          expectedIncome: [...monthPlan.expectedIncome, updatedEntry],
+        };
+        setShowAddIncome(false);
+      } else {
+        updatedPlan = {
+          ...monthPlan,
+          expectedExpenses: [...monthPlan.expectedExpenses, updatedEntry],
+        };
+        setShowAddExpense(false);
+      }
+
+      // Validate plan data before sending
+      api.monthlyPlans.validatePlanData(updatedPlan);
+      
+      await api.monthlyPlans.updateMonthlyPlan(selectedMonth, updatedPlan);
+      setMonthPlan(updatedPlan);
+      setNewEntry({ category: "", amount: "", description: "", familyMember: "" });
+      
     } catch (err) {
-      setError("Failed to save plan. Please try again.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to save plan.";
+      setError(errorMessage);
       console.error("Error saving plan:", err);
-      setMonthPlan(monthPlan); // Revert on failure
+    } finally {
+      setOperationLoading(prev => ({ ...prev, [operationType]: false }));
     }
   };
 
   const removeEntry = async (id, type) => {
-    let updatedPlan;
-    if (type === TRANSACTION_TYPES.INCOME) {
-      updatedPlan = {
-        ...monthPlan,
-        expectedIncome: monthPlan.expectedIncome.filter((entry) => entry.id !== id),
-      };
-    } else {
-      updatedPlan = {
-        ...monthPlan,
-        expectedExpenses: monthPlan.expectedExpenses.filter((entry) => entry.id !== id),
-      };
-    }
-
-    setMonthPlan(updatedPlan);
+    setOperationLoading(prev => ({ ...prev, removeEntry: true }));
     setError(null);
 
     try {
-      await onSavePlan({ month: selectedMonth, ...updatedPlan });
+      let updatedPlan;
+      if (type === TRANSACTION_TYPES.INCOME) {
+        updatedPlan = {
+          ...monthPlan,
+          expectedIncome: monthPlan.expectedIncome.filter((entry) => entry.id !== id),
+        };
+      } else {
+        updatedPlan = {
+          ...monthPlan,
+          expectedExpenses: monthPlan.expectedExpenses.filter((entry) => entry.id !== id),
+        };
+      }
+
+      // Validate plan data before sending
+      api.monthlyPlans.validatePlanData(updatedPlan);
+      
+      await api.monthlyPlans.updateMonthlyPlan(selectedMonth, updatedPlan);
+      setMonthPlan(updatedPlan);
+      
     } catch (err) {
-      setError("Failed to remove entry. Please try again.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to remove entry.";
+      setError(errorMessage);
       console.error("Error removing entry:", err);
-      setMonthPlan(monthPlan); // Revert on failure
+    } finally {
+      setOperationLoading(prev => ({ ...prev, removeEntry: false }));
     }
   };
 
   const handleNotesChange = async (e) => {
-    const updatedPlan = { ...monthPlan, notes: e.target.value };
-    setMonthPlan(updatedPlan);
+    setOperationLoading(prev => ({ ...prev, saveNotes: true }));
     setError(null);
 
     try {
-      await onSavePlan({ month: selectedMonth, ...updatedPlan });
+      const updatedPlan = { ...monthPlan, notes: e.target.value };
+      await api.monthlyPlans.updateMonthlyPlan(selectedMonth, updatedPlan);
+      setMonthPlan(updatedPlan);
+      
     } catch (err) {
-      setError("Failed to save notes. Please try again.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to save notes.";
+      setError(errorMessage);
       console.error("Error saving notes:", err);
-      setMonthPlan(monthPlan); // Revert on failure
+      setMonthPlan(prev => ({ ...prev, notes: e.target.value })); // Update UI optimistically
+    } finally {
+      setOperationLoading(prev => ({ ...prev, saveNotes: false }));
     }
   };
 
@@ -346,23 +402,77 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
     }));
   }, [selectedMonth, calculateTotals.expected.expenses, actualTransactions]);
 
-  // Render
-  if (loading) {
+  // Render family member field only if it's a family plan
+  const renderFamilyMemberField = () => {
+    if (!monthPlan.isFamilyPlan) return null;
+
     return (
-      <div className="text-center p-6 text-gray-600">
-        <span className="animate-pulse">Loading monthly plan...</span>
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Family Member
+          <span className="text-red-500 ml-1">*</span>
+        </label>
+        <select
+          value={newEntry.familyMember}
+          onChange={(e) => setNewEntry({ ...newEntry, familyMember: e.target.value })}
+          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">Select a family member</option>
+          {familyMembers.map((member) => (
+            <option key={member.id} value={member.name}>
+              {member.icon} {member.name}
+            </option>
+          ))}
+        </select>
       </div>
     );
+  };
+
+  // Error display component
+  const ErrorMessage = ({ message }) => {
+    if (!message) return null;
+
+    return (
+      <div className="p-4 bg-red-100 text-red-600 rounded-lg flex items-center gap-2 mb-4">
+        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+        <span className="text-sm">{message}</span>
+      </div>
+    );
+  };
+
+  // Loading spinner component
+  const LoadingSpinner = () => (
+    <div className="flex items-center justify-center p-6">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+    </div>
+  );
+
+  // Update button rendering to show loading state
+  const renderActionButton = (type, isLoading, onClick, children) => (
+    <button
+      onClick={onClick}
+      disabled={isLoading}
+      className={`w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors duration-200 flex items-center justify-center gap-2 ${
+        isLoading ? 'opacity-75 cursor-not-allowed' : ''
+      }`}
+    >
+      {isLoading ? (
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+      ) : (
+        <PlusCircle className="w-5 h-5" />
+      )}
+      {children}
+    </button>
+  );
+
+  // Render
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
   return (
     <div className="space-y-6">
-      {error && (
-        <div className="p-4 bg-red-100 text-red-600 rounded-lg flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5" />
-          {error}
-        </div>
-      )}
+      <ErrorMessage message={error} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -570,9 +680,16 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
       {/* Expected Income Section */}
       <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">Expected Income</h3>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Expected Income
+            {monthPlan.isFamilyPlan && <span className="text-sm text-gray-500 ml-2">(Family Plan)</span>}
+          </h3>
           <button
-            onClick={() => setShowAddIncome(!showAddIncome)}
+            onClick={() => {
+              setShowAddIncome(!showAddIncome);
+              setError(null);
+              setNewEntry({ category: "", amount: "", description: "", familyMember: "" });
+            }}
             className="p-2 hover:bg-gray-100 rounded-xl transition-all duration-200"
           >
             <PlusCircle className="w-5 h-5 text-blue-500" />
@@ -581,45 +698,43 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
 
         {showAddIncome && (
           <div className="mb-6 p-4 bg-gray-50 rounded-xl space-y-4">
-            <select
-              value={newEntry.category}
-              onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Category</option>
-              {Object.entries(incomeCategories).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value.icon} {key}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={newEntry.amount}
-              onChange={(e) => setNewEntry({ ...newEntry, amount: e.target.value })}
-              placeholder="Amount"
-              min="0"
-              step="0.01"
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <select
-              value={newEntry.familyMember}
-              onChange={(e) => setNewEntry({ ...newEntry, familyMember: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Family Member</option>
-              {familyMembers.map((member) => (
-                <option key={member.id} value={member.name}>
-                  {member.icon} {member.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => handleAddEntry(TRANSACTION_TYPES.INCOME)}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors duration-200"
-            >
-              Add Expected Income
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  value={newEntry.category}
+                  onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Category</option>
+                  {Object.entries(incomeCategories).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.icon} {key}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={newEntry.amount}
+                  onChange={(e) => setNewEntry({ ...newEntry, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  min="0"
+                  step="0.01"
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            {renderFamilyMemberField()}
+            {renderActionButton(TRANSACTION_TYPES.INCOME, operationLoading.addIncome, () => handleAddEntry(TRANSACTION_TYPES.INCOME), "Add Expected Income")}
           </div>
         )}
 
@@ -659,9 +774,16 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
       {/* Expected Expenses Section */}
       <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-800">Expected Expenses</h3>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Expected Expenses
+            {monthPlan.isFamilyPlan && <span className="text-sm text-gray-500 ml-2">(Family Plan)</span>}
+          </h3>
           <button
-            onClick={() => setShowAddExpense(!showAddExpense)}
+            onClick={() => {
+              setShowAddExpense(!showAddExpense);
+              setError(null);
+              setNewEntry({ category: "", amount: "", description: "", familyMember: "" });
+            }}
             className="p-2 hover:bg-gray-100 rounded-xl transition-all duration-200"
           >
             <PlusCircle className="w-5 h-5 text-blue-500" />
@@ -670,45 +792,43 @@ const MonthPlanner = ({ selectedMonth, actualTransactions, onSavePlan }) => {
 
         {showAddExpense && (
           <div className="mb-6 p-4 bg-gray-50 rounded-xl space-y-4">
-            <select
-              value={newEntry.category}
-              onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Category</option>
-              {Object.entries(categories).map(([key, value]) => (
-                <option key={key} value={key}>
-                  {value.icon} {key}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={newEntry.amount}
-              onChange={(e) => setNewEntry({ ...newEntry, amount: e.target.value })}
-              placeholder="Amount"
-              min="0"
-              step="0.01"
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <select
-              value={newEntry.familyMember}
-              onChange={(e) => setNewEntry({ ...newEntry, familyMember: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Family Member</option>
-              {familyMembers.map((member) => (
-                <option key={member.id} value={member.name}>
-                  {member.icon} {member.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => handleAddEntry(TRANSACTION_TYPES.EXPENSE)}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors duration-200"
-            >
-              Add Expected Expense
-            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  value={newEntry.category}
+                  onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Category</option>
+                  {Object.entries(categories).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.icon} {key}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={newEntry.amount}
+                  onChange={(e) => setNewEntry({ ...newEntry, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  min="0"
+                  step="0.01"
+                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            {renderFamilyMemberField()}
+            {renderActionButton(TRANSACTION_TYPES.EXPENSE, operationLoading.addExpense, () => handleAddEntry(TRANSACTION_TYPES.EXPENSE), "Add Expected Expense")}
           </div>
         )}
 

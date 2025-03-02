@@ -149,12 +149,94 @@ const aiApi = {
     api.put(`/ai/notifications/${notificationId}/read`)
 };
 
+// Monthly Plans API calls
+const monthlyPlansApi = {
+  getMonthlyPlan: async (month) => {
+    console.log('Fetching monthly plan for:', month);
+    try {
+      const response = await api.get(`/monthly-plans/${month}`);
+      console.log('Monthly plan response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error fetching monthly plan:', error.response?.data || error);
+      throw error;
+    }
+  },
+  
+  createMonthlyPlan: async (month, data) => {
+    console.log('Creating monthly plan for:', month, 'with data:', data);
+    if (!data.expectedIncome || !data.expectedExpenses) {
+      throw new Error('Invalid monthly plan data: missing required fields');
+    }
+    try {
+      const response = await api.post(`/monthly-plans/${month}`, data);
+      console.log('Monthly plan created:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error creating monthly plan:', error.response?.data || error);
+      throw error;
+    }
+  },
+  
+  updateMonthlyPlan: async (month, data) => {
+    console.log('Updating monthly plan for:', month, 'with data:', data);
+    if (!data.expectedIncome || !data.expectedExpenses) {
+      throw new Error('Invalid monthly plan data: missing required fields');
+    }
+    try {
+      const response = await api.put(`/monthly-plans/${month}`, data);
+      console.log('Monthly plan updated:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error updating monthly plan:', error.response?.data || error);
+      throw error;
+    }
+  },
+  
+  deleteMonthlyPlan: async (month) => {
+    console.log('Deleting monthly plan for:', month);
+    try {
+      const response = await api.delete(`/monthly-plans/${month}`);
+      console.log('Monthly plan deleted:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error deleting monthly plan:', error.response?.data || error);
+      throw error;
+    }
+  },
+  
+  // Helper function to determine if response indicates a family plan
+  isFamilyPlan: (response) => {
+    if (!response?.data) {
+      console.warn('Invalid response for family plan check:', response);
+      return false;
+    }
+    return response.data.is_family_plan === true;
+  },
+  
+  // Validate monthly plan data structure
+  validatePlanData: (data) => {
+    const errors = [];
+    if (!Array.isArray(data.expectedIncome)) {
+      errors.push('expectedIncome must be an array');
+    }
+    if (!Array.isArray(data.expectedExpenses)) {
+      errors.push('expectedExpenses must be an array');
+    }
+    if (errors.length > 0) {
+      throw new Error(`Invalid plan data: ${errors.join(', ')}`);
+    }
+    return true;
+  }
+};
+
 // Extend the api object with the new endpoints
 Object.assign(api, {
   family: familyApi,
   user: userApi,
   categories: categoriesApi,
-  ai: aiApi
+  ai: aiApi,
+  monthlyPlans: monthlyPlansApi
 });
 
 // Initialize headers if token exists

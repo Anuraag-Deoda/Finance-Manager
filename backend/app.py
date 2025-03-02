@@ -12,6 +12,7 @@ import bcrypt
 from functools import wraps
 import logging
 from ai.routes import ai_bp
+from routes.monthly_plans import monthly_plans_bp
 
 # Register the blueprint
 
@@ -20,6 +21,7 @@ app.config.from_object(Config)
 db.init_app(app)
 jwt = JWTManager(app)
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
+app.register_blueprint(monthly_plans_bp, url_prefix='/api/monthly-plans')
 
 
 # Configure logging
@@ -550,21 +552,48 @@ def join_family():
 @handle_errors
 def register():
     try:
+        print("\n=== Registration Attempt ===")
         data = request.get_json()
+        print(f"Registration data received: {data}")
+        
         if not data or 'email' not in data or 'password' not in data:
+            print("Missing required fields in registration data")
             return jsonify({'message': 'Missing required fields'}), 400
 
-        if User.query.filter_by(email=data['email']).first():
+        existing_user = User.query.filter_by(email=data['email']).first()
+        if existing_user:
+            print(f"Email already exists: {data['email']}")
             return jsonify({'message': 'Email already exists'}), 400
 
-        hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-        user = User(
-            email=data['email'],
-            password=hashed_password,
-            role='user'  # Default role
-        )
-        db.session.add(user)
-        db.session.commit()
+        print(f"Creating new user with email: {data['email']}")
+        try:
+            hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+            print("Password successfully hashed")
+        except Exception as e:
+            print(f"Error hashing password: {str(e)}")
+            return jsonify({'message': 'Error processing password'}), 500
+
+        try:
+            user = User(
+                email=data['email'],
+                password=hashed_password,  # This will be handled by __init__
+                name=data.get('name', ''),
+                role='user'  # Default role
+            )
+            print("User object created successfully")
+        except Exception as e:
+            print(f"Error creating user object: {str(e)}")
+            return jsonify({'message': 'Error creating user'}), 500
+
+        try:
+            print("Attempting to add user to database")
+            db.session.add(user)
+            db.session.commit()
+            print(f"User successfully registered with ID: {user.id}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Database error: {str(e)}")
+            return jsonify({'message': 'Database error during registration'}), 500
 
         return jsonify({
             'message': 'User registered successfully',
@@ -572,6 +601,10 @@ def register():
         }), 201
     except Exception as e:
         db.session.rollback()
+        print(f"\n=== Registration Error ===")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        print(f"Error details: ", e)
         return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
