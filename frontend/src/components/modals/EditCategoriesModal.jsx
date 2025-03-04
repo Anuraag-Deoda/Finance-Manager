@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Edit2, Check, AlertCircle } from 'lucide-react';
 import api from '../../services/api';
+import { categories as predefinedExpenseCategories, incomeCategories as predefinedIncomeCategories } from '../../utils/constants';
+import { toast } from 'react-hot-toast';
 
 const EditCategoriesModal = ({ show, onClose }) => {
   const [categories, setCategories] = useState([]);
@@ -26,19 +28,63 @@ const EditCategoriesModal = ({ show, onClose }) => {
   const fetchCategories = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get('/api/categories');
-      setCategories(response.data);
+      // First try to get custom categories from the API
+      const response = await api.categories.getCategories();
+      
+      if (response.data && response.data.length > 0) {
+        setCategories(response.data);
+      } else {
+        // If no custom categories, use the predefined ones
+        const predefinedCategories = [];
+        
+        // Convert expense categories
+        Object.entries(predefinedExpenseCategories).forEach(([name, details]) => {
+          predefinedCategories.push({
+            id: `expense-${name}`,
+            name,
+            type: 'expense',
+            icon: details.icon,
+            color: details.primary,
+            description: details.description,
+            suggested_limit: details.suggestedLimit * 100,
+            is_predefined: true
+          });
+        });
+        
+        // Convert income categories
+        Object.entries(predefinedIncomeCategories).forEach(([name, details]) => {
+          predefinedCategories.push({
+            id: `income-${name}`,
+            name,
+            type: 'income',
+            icon: details.icon,
+            color: details.primary,
+            description: details.description,
+            suggested_limit: 0,
+            is_predefined: true
+          });
+        });
+        
+        setCategories(predefinedCategories);
+      }
     } catch (err) {
       setError('Failed to fetch categories');
+      console.error('Error fetching categories:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAddCategory = async () => {
+    if (!newCategory.name) {
+      setError('Category name is required');
+      return;
+    }
+    
     try {
       setIsLoading(true);
-      const response = await api.post('/api/categories', newCategory);
+      setError(null);
+      const response = await api.categories.createCategory(newCategory);
       setCategories([...categories, response.data]);
       setShowAddForm(false);
       setNewCategory({
@@ -49,23 +95,49 @@ const EditCategoriesModal = ({ show, onClose }) => {
         description: '',
         suggested_limit: 0
       });
+      toast.success('Category added successfully');
     } catch (err) {
       setError('Failed to add category');
+      console.error('Error adding category:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUpdateCategory = async (id) => {
+    if (!editingCategory.name) {
+      setError('Category name is required');
+      return;
+    }
+    
     try {
       setIsLoading(true);
-      await api.put(`/api/categories/${id}`, editingCategory);
-      setCategories(categories.map(cat => 
-        cat.id === id ? { ...cat, ...editingCategory } : cat
-      ));
+      setError(null);
+      
+      // Check if it's a predefined category
+      if (id.startsWith('expense-') || id.startsWith('income-')) {
+        // For predefined categories, we create a new custom category
+        const response = await api.categories.createCategory({
+          ...editingCategory,
+          is_predefined: false
+        });
+        
+        setCategories(categories.map(cat => 
+          cat.id === id ? { ...response.data } : cat
+        ));
+      } else {
+        // For custom categories, we update them
+        await api.categories.updateCategory(id, editingCategory);
+        setCategories(categories.map(cat => 
+          cat.id === id ? { ...cat, ...editingCategory } : cat
+        ));
+      }
+      
       setEditingCategory(null);
+      toast.success('Category updated successfully');
     } catch (err) {
       setError('Failed to update category');
+      console.error('Error updating category:', err);
     } finally {
       setIsLoading(false);
     }
@@ -76,10 +148,22 @@ const EditCategoriesModal = ({ show, onClose }) => {
 
     try {
       setIsLoading(true);
-      await api.delete(`/api/categories/${id}`);
-      setCategories(categories.filter(cat => cat.id !== id));
+      setError(null);
+      
+      // Check if it's a predefined category
+      if (id.startsWith('expense-') || id.startsWith('income-')) {
+        // For predefined categories, we just remove them from the UI
+        setCategories(categories.filter(cat => cat.id !== id));
+        toast.success('Category removed from list');
+      } else {
+        // For custom categories, we delete them from the API
+        await api.categories.deleteCategory(id);
+        setCategories(categories.filter(cat => cat.id !== id));
+        toast.success('Category deleted successfully');
+      }
     } catch (err) {
       setError('Failed to delete category');
+      console.error('Error deleting category:', err);
     } finally {
       setIsLoading(false);
     }

@@ -695,24 +695,96 @@ def add_transaction():
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
+        
+        # Log the incoming data for debugging
+        logger.info(f"Adding transaction with data: {data}")
 
         # Validate required fields
         required_fields = ['type', 'amount', 'category', 'date', 'familyMember']
         if not all(field in data for field in required_fields):
             return jsonify({'message': 'Missing required fields'}), 400
+            
+        # Get the user to check if they have a family
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        # Get or create the category
+        category = None
+        if isinstance(data['category'], int) or data['category'].isdigit():
+            # If category is an ID
+            category_id = int(data['category'])
+            category = Category.query.get(category_id)
+            if not category:
+                return jsonify({'message': f'Category with ID {category_id} not found'}), 404
+        else:
+            # If category is a name, find or create it
+            category_name = data['category']
+            category = Category.query.filter_by(
+                name=category_name, 
+                user_id=user_id,
+                type=data['type']
+            ).first()
+            
+            if not category:
+                # Create a new category
+                category = Category(
+                    name=category_name,
+                    type=data['type'],
+                    icon='📊',  # Default icon
+                    color='#94A3B8',  # Default color
+                    description=f'Auto-created {data["type"]} category',
+                    user_id=user_id,
+                    family_id=user.family_id
+                )
+                db.session.add(category)
+                db.session.flush()  # Get the ID without committing
+                
+        # Get or create the family member
+        family_member_id = None
+        if user.family_id:
+            if isinstance(data['familyMember'], int) or data['familyMember'].isdigit():
+                # If familyMember is an ID
+                family_member_id = int(data['familyMember'])
+                family_member = FamilyMember.query.get(family_member_id)
+                if not family_member or family_member.family_id != user.family_id:
+                    return jsonify({'message': f'Family member with ID {family_member_id} not found in your family'}), 404
+            else:
+                # If familyMember is a name, find or create it
+                family_member_name = data['familyMember']
+                family_member = FamilyMember.query.filter_by(
+                    name=family_member_name, 
+                    family_id=user.family_id
+                ).first()
+                
+                if not family_member:
+                    # Create a new family member
+                    family_member = FamilyMember(
+                        name=family_member_name,
+                        role='Member',  # Default role
+                        family_id=user.family_id
+                    )
+                    db.session.add(family_member)
+                    db.session.flush()  # Get the ID without committing
+                
+                family_member_id = family_member.id
 
+        # Create the transaction
         transaction = Transaction(
             user_id=int(user_id),
+            family_id=user.family_id,
             type=data['type'],
             amount=float(data['amount']),
-            category=data['category'],
+            category_id=category.id,
             description=data.get('description', ''),
             date=datetime.strptime(data['date'], '%Y-%m-%d'),
-            family_member=data['familyMember'],
+            family_member_id=family_member_id,
             is_recurring=data.get('isRecurring', False)
         )
         db.session.add(transaction)
         db.session.commit()
+        
+        logger.info(f"Transaction added successfully with ID: {transaction.id}")
 
         return jsonify({
             'message': 'Transaction added',
@@ -721,16 +793,20 @@ def add_transaction():
                 'id': transaction.id,
                 'type': transaction.type,
                 'amount': float(transaction.amount),
-                'category': transaction.category,
+                'category': category.name,
+                'category_id': category.id,
                 'description': transaction.description,
                 'date': transaction.date.strftime('%Y-%m-%d'),
-                'familyMember': transaction.family_member,
+                'familyMember': data['familyMember'],
+                'family_member_id': family_member_id,
                 'isRecurring': transaction.is_recurring
             }
         }), 201
     except ValueError as e:
+        logger.error(f"ValueError in add_transaction: {str(e)}")
         return jsonify({'message': f'Invalid data: {str(e)}'}), 400
     except Exception as e:
+        logger.error(f"Exception in add_transaction: {str(e)}")
         db.session.rollback()
         return jsonify({'message': 'Failed to add transaction', 'error': str(e)}), 500
 
@@ -740,32 +816,98 @@ def add_transaction():
 def update_transaction(id):
     try:
         user_id = get_jwt_identity()
-        transaction = Transaction.query.get_or_404(id)
-        
-        if transaction.user_id != int(user_id):
-            return jsonify({'message': 'Unauthorized'}), 403
-
         data = request.get_json()
-        if not data:
-            return jsonify({'message': 'No data provided'}), 400
+        
+        # Log the incoming data for debugging
+        logger.info(f"Updating transaction {id} with data: {data}")
 
-        # Update fields if provided
-        if 'type' in data:
-            transaction.type = data['type']
-        if 'amount' in data:
-            transaction.amount = float(data['amount'])
-        if 'category' in data:
-            transaction.category = data['category']
-        if 'description' in data:
-            transaction.description = data['description']
-        if 'date' in data:
-            transaction.date = datetime.strptime(data['date'], '%Y-%m-%d')
-        if 'familyMember' in data:
-            transaction.family_member = data['familyMember']
-        if 'isRecurring' in data:
-            transaction.is_recurring = data['isRecurring']
+        # Validate required fields
+        required_fields = ['type', 'amount', 'category', 'date', 'familyMember']
+        if not all(field in data for field in required_fields):
+            return jsonify({'message': 'Missing required fields'}), 400
+
+        # Get the transaction
+        transaction = Transaction.query.filter_by(id=id, user_id=user_id).first()
+        if not transaction:
+            return jsonify({'message': 'Transaction not found'}), 404
+            
+        # Get the user to check if they have a family
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        # Get or create the category
+        category = None
+        if isinstance(data['category'], int) or data['category'].isdigit():
+            # If category is an ID
+            category_id = int(data['category'])
+            category = Category.query.get(category_id)
+            if not category:
+                return jsonify({'message': f'Category with ID {category_id} not found'}), 404
+        else:
+            # If category is a name, find or create it
+            category_name = data['category']
+            category = Category.query.filter_by(
+                name=category_name, 
+                user_id=user_id,
+                type=data['type']
+            ).first()
+            
+            if not category:
+                # Create a new category
+                category = Category(
+                    name=category_name,
+                    type=data['type'],
+                    icon='📊',  # Default icon
+                    color='#94A3B8',  # Default color
+                    description=f'Auto-created {data["type"]} category',
+                    user_id=user_id,
+                    family_id=user.family_id
+                )
+                db.session.add(category)
+                db.session.flush()  # Get the ID without committing
+                
+        # Get or create the family member
+        family_member_id = None
+        if user.family_id:
+            if isinstance(data['familyMember'], int) or data['familyMember'].isdigit():
+                # If familyMember is an ID
+                family_member_id = int(data['familyMember'])
+                family_member = FamilyMember.query.get(family_member_id)
+                if not family_member or family_member.family_id != user.family_id:
+                    return jsonify({'message': f'Family member with ID {family_member_id} not found in your family'}), 404
+            else:
+                # If familyMember is a name, find or create it
+                family_member_name = data['familyMember']
+                family_member = FamilyMember.query.filter_by(
+                    name=family_member_name, 
+                    family_id=user.family_id
+                ).first()
+                
+                if not family_member:
+                    # Create a new family member
+                    family_member = FamilyMember(
+                        name=family_member_name,
+                        role='Member',  # Default role
+                        family_id=user.family_id
+                    )
+                    db.session.add(family_member)
+                    db.session.flush()  # Get the ID without committing
+                
+                family_member_id = family_member.id
+
+        # Update the transaction
+        transaction.type = data['type']
+        transaction.amount = float(data['amount'])
+        transaction.category_id = category.id
+        transaction.description = data.get('description', '')
+        transaction.date = datetime.strptime(data['date'], '%Y-%m-%d')
+        transaction.family_member_id = family_member_id
+        transaction.is_recurring = data.get('isRecurring', False)
 
         db.session.commit()
+        
+        logger.info(f"Transaction {id} updated successfully")
 
         return jsonify({
             'message': 'Transaction updated',
@@ -773,16 +915,20 @@ def update_transaction(id):
                 'id': transaction.id,
                 'type': transaction.type,
                 'amount': float(transaction.amount),
-                'category': transaction.category,
+                'category': category.name,
+                'category_id': category.id,
                 'description': transaction.description,
                 'date': transaction.date.strftime('%Y-%m-%d'),
-                'familyMember': transaction.family_member,
+                'familyMember': data['familyMember'],
+                'family_member_id': family_member_id,
                 'isRecurring': transaction.is_recurring
             }
-        })
+        }), 200
     except ValueError as e:
+        logger.error(f"ValueError in update_transaction: {str(e)}")
         return jsonify({'message': f'Invalid data: {str(e)}'}), 400
     except Exception as e:
+        logger.error(f"Exception in update_transaction: {str(e)}")
         db.session.rollback()
         return jsonify({'message': 'Failed to update transaction', 'error': str(e)}), 500
 

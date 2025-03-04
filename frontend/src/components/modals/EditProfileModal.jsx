@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Loader, User } from 'lucide-react';
-import api from '../../services/api';
+import api, { getProfileImageUrl, isValidImageUrl } from '../../services/api';
+import { toast } from 'react-hot-toast';
 
 const EditProfileModal = ({ show, onClose, user }) => {
   const [formData, setFormData] = useState({
@@ -20,6 +21,11 @@ const EditProfileModal = ({ show, onClose, user }) => {
         email: user.email || '',
         profile_image: user.profile_image || ''
       });
+      
+      // If user has a profile image, set it as preview
+      if (isValidImageUrl(user.profile_image)) {
+        setPreviewImage(getProfileImageUrl(user.profile_image));
+      }
     }
   }, [user]);
 
@@ -27,21 +33,41 @@ const EditProfileModal = ({ show, onClose, user }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a valid image file (JPEG, PNG, GIF, WEBP)');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
     // Create preview URL
     const previewUrl = URL.createObjectURL(file);
     setPreviewImage(previewUrl);
-
-    const formData = new FormData();
-    formData.append('image', file);
 
     try {
       setIsLoading(true);
       setError(null);
       const response = await api.user.uploadProfileImage(file);
-      setFormData(prev => ({ ...prev, profile_image: response.profile_image }));
+      
+      if (response && response.profile_image) {
+        setFormData(prev => ({ 
+          ...prev, 
+          profile_image: response.profile_image 
+        }));
+        toast.success('Profile image uploaded successfully');
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (err) {
-      setError('Failed to upload image');
-      setPreviewImage(null);
+      console.error('Error uploading image:', err);
+      setError('Failed to upload image. Please try again.');
+      // Don't clear preview image on error - let user try again
     } finally {
       setIsLoading(false);
     }
@@ -49,6 +75,12 @@ const EditProfileModal = ({ show, onClose, user }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+    
     try {
       setIsLoading(true);
       setError(null);
@@ -56,8 +88,10 @@ const EditProfileModal = ({ show, onClose, user }) => {
         name: formData.name,
         profile_image: formData.profile_image
       });
+      toast.success('Profile updated successfully');
       onClose();
     } catch (err) {
+      console.error('Error updating profile:', err);
       setError('Failed to update profile');
     } finally {
       setIsLoading(false);
@@ -67,7 +101,7 @@ const EditProfileModal = ({ show, onClose, user }) => {
   // Cleanup preview URL when component unmounts or modal closes
   useEffect(() => {
     return () => {
-      if (previewImage) {
+      if (previewImage && !previewImage.includes('http')) {
         URL.revokeObjectURL(previewImage);
       }
     };
@@ -92,9 +126,9 @@ const EditProfileModal = ({ show, onClose, user }) => {
           {/* Profile Image */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative group">
-              {previewImage || formData.profile_image ? (
+              {previewImage ? (
                 <img
-                  src={previewImage || formData.profile_image}
+                  src={previewImage}
                   alt="Profile"
                   className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
                   onError={(e) => {
@@ -110,13 +144,18 @@ const EditProfileModal = ({ show, onClose, user }) => {
                 </div>
               )}
               <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
-                <Upload className="w-8 h-8 text-white" />
+                {isLoading ? (
+                  <Loader className="w-8 h-8 text-white animate-spin" />
+                ) : (
+                  <Upload className="w-8 h-8 text-white" />
+                )}
               </div>
               <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
                 className="absolute inset-0 opacity-0 cursor-pointer"
+                disabled={isLoading}
               />
             </div>
             <span className="text-sm text-gray-500">Click to upload new image</span>

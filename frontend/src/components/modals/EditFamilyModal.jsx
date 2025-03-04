@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Edit2, Check, AlertCircle, UserPlus, User, Search, Mail } from 'lucide-react';
-import api from '../../services/api';
+import api, { getProfileImageUrl, isValidImageUrl } from '../../services/api';
+import { toast } from 'react-hot-toast';
 
 const AVAILABLE_ICONS = ['👨', '👩', '👦', '👧', '👴', '👵', '🧑'];
 const AVAILABLE_ROLES = ['Parent', 'Child', 'Grandparent', 'Guardian'];
@@ -21,7 +22,6 @@ const EditFamilyModal = ({ show, onClose }) => {
 
   const [newMember, setNewMember] = useState({
     role: '',
-    icon: '👤',
     color: DEFAULT_COLORS[0]
   });
 
@@ -54,9 +54,17 @@ const EditFamilyModal = ({ show, onClose }) => {
     try {
       setIsLoading(true);
       const response = await api.family.getMembers();
-      setMembers(response.data);
+      
+      // Map the response to include profile image URLs
+      const mappedMembers = response.data.map(member => ({
+        ...member,
+        profile_image: member.profile_image ? getProfileImageUrl(member.profile_image) : null
+      }));
+      
+      setMembers(mappedMembers);
     } catch (err) {
       setError('Failed to fetch family members');
+      console.error('Error fetching family members:', err);
     } finally {
       setIsLoading(false);
     }
@@ -211,6 +219,34 @@ const EditFamilyModal = ({ show, onClose }) => {
     </div>
   );
 
+  // Render a member's avatar
+  const renderMemberAvatar = (member) => {
+    if (isValidImageUrl(member.profile_image)) {
+      return (
+        <img
+          src={member.profile_image}
+          alt={member.name}
+          className="w-10 h-10 rounded-full object-cover"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = '';
+            e.target.classList.add('hidden');
+            e.target.parentElement.innerHTML = `<div class="w-10 h-10 rounded-full bg-${member.color ? member.color.replace('#', '') : 'blue-100'} flex items-center justify-center"><span class="text-white font-medium">${member.name.charAt(0).toUpperCase()}</span></div>`;
+          }}
+        />
+      );
+    }
+    
+    return (
+      <div 
+        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium"
+        style={{ backgroundColor: member.color || '#4ECDC4' }}
+      >
+        {member.name.charAt(0).toUpperCase()}
+      </div>
+    );
+  };
+
   if (!show) return null;
 
   return (
@@ -278,33 +314,42 @@ const EditFamilyModal = ({ show, onClose }) => {
         <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
           {activeTab === 'members' && (
             <div className="space-y-4">
-              {members.map(member => (
-                <div
-                  key={member.id}
-                  className="p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors duration-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
-                        style={{ backgroundColor: member.color + '33' }}
-                      >
-                        {member.icon}
+              {members.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No family members yet</p>
+                  <button
+                    onClick={() => setActiveTab('add')}
+                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200"
+                  >
+                    Add Family Member
+                  </button>
+                </div>
+              ) : (
+                members.map(member => (
+                  <div
+                    key={member.id}
+                    className="p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors duration-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {renderMemberAvatar(member)}
+                        <div>
+                          <h3 className="font-medium text-gray-900">{member.name}</h3>
+                          <p className="text-sm text-gray-500">{member.role}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-medium text-gray-900">{member.name}</h3>
-                        <p className="text-sm text-gray-500">{member.role}</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="p-2 hover:bg-red-100 rounded-xl transition-colors duration-200"
+                        >
+                          <Trash2 size={16} className="text-red-500" />
+                        </button>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemoveMember(member.id)}
-                      className="p-2 hover:bg-red-100 rounded-xl transition-colors duration-200"
-                    >
-                      <Trash2 size={16} className="text-red-500" />
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 

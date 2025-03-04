@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Users, Sparkles, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
+import { 
+    Users, 
+    Sparkles, 
+    ChevronDown, 
+    ChevronUp, 
+    Lightbulb, 
+    AlertTriangle, 
+    TrendingUp, 
+    ArrowUpRight, 
+    ArrowDownRight 
+} from 'lucide-react';
+import api from '../../services/api';
 
 const AIInsightsPanel = ({ transactions }) => {
     const [insights, setInsights] = useState([]);
@@ -17,8 +28,8 @@ const AIInsightsPanel = ({ transactions }) => {
         setError(null);
         
         try {
-            const response = await api.post('/ai/insights', { transactions });
-            setInsights(response.data.insights);
+            const response = await api.ai.getInsights(transactions);
+            setInsights(response.data.insights || []);
         } catch (err) {
             console.error('Error fetching AI insights:', err);
             setError('Failed to load AI insights');

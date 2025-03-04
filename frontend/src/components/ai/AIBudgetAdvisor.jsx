@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, ArrowRight, Check, Loading } from 'lucide-react';
+import { BrainCircuit, ArrowRight, Check, Loader } from 'lucide-react';
 import api from '../../services/api';
 
 const AIBudgetAdvisor = ({ currentBudget, monthlyIncome, onApplyRecommendation }) => {

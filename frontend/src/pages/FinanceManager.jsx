@@ -24,6 +24,7 @@ import AIReportGenerator from "../components/ai/AIReportGenerator.jsx";
 import AIFamilyBudgetOptimizer from "../components/ai/AIFamilyBudgetOptimizer.jsx";
 import AISavingsPlanner from "../components/ai/AISavingsPlanner.jsx";
 import FamilyDashboard from "../components/FamilyDashboard.jsx";
+import { toast } from 'react-hot-toast';
 
 const FinanceManager = () => {
     // Core state management
@@ -141,28 +142,56 @@ const FinanceManager = () => {
     // Transaction CRUD Operations
     const handleAddTransaction = async () => {
         const errors = validateTransaction(newTransaction);
-        if (Object.keys(errors).length > 0) return;
+        if (Object.keys(errors).length > 0) {
+            // Display validation errors
+            setError(Object.values(errors).join(', '));
+            return;
+        }
 
         try {
             setLoading(true);
-            const response = await api.post('transactions', newTransaction);
+            setError(null);
+            
+            // Ensure amount is a number
+            const transactionData = {
+                ...newTransaction,
+                amount: parseFloat(newTransaction.amount)
+            };
+            
+            console.log('Sending transaction data:', transactionData);
+            const response = await api.post('transactions', transactionData);
+            console.log('Transaction response:', response.data);
+            
+            // Add the new transaction to the state with the data from the response
+            if (response.data && response.data.transaction) {
+                setTransactions(prev => [
+                    response.data.transaction,
+                    ...prev
+                ]);
+                
+                // Close modal and reset form
+                setShowAddModal(false);
+                setNewTransaction({
+                    type: TRANSACTION_TYPES.EXPENSE,
+                    amount: "",
+                    category: "",
+                    description: "",
+                    date: new Date().toISOString().split("T")[0],
+                    familyMember: "",
+                    isRecurring: false,
+                });
 
-            setTransactions(prev => [...prev, { ...newTransaction, id: response.data.id }]);
-            setShowAddModal(false);
-            setNewTransaction({
-                type: TRANSACTION_TYPES.EXPENSE,
-                amount: "",
-                category: "",
-                description: "",
-                date: new Date().toISOString().split("T")[0],
-                familyMember: "",
-                isRecurring: false,
-            });
-
-            fetchDashboardData();
+                // Refresh dashboard data
+                fetchDashboardData();
+                
+                // Show success message
+                toast.success('Transaction added successfully');
+            } else {
+                throw new Error('Invalid response from server');
+            }
         } catch (err) {
-            setError('Failed to add transaction');
             console.error('Error adding transaction:', err);
+            handleError(err);
         } finally {
             setLoading(false);
         }
@@ -171,33 +200,61 @@ const FinanceManager = () => {
     const handleEditTransaction = async (transaction) => {
         try {
             setLoading(true);
-            await api.put(`transactions/${transaction.id}`, transaction);
-
-            setTransactions(prev =>
-                prev.map(t => t.id === transaction.id ? transaction : t)
-            );
-
-            fetchDashboardData();
+            setError(null);
+            
+            // Ensure amount is a number
+            const transactionData = {
+                ...transaction,
+                amount: parseFloat(transaction.amount)
+            };
+            
+            console.log('Sending edit transaction data:', transactionData);
+            const response = await api.put(`transactions/${transaction.id}`, transactionData);
+            console.log('Edit transaction response:', response.data);
+            
+            // Update the transaction in the state with the data from the response
+            if (response.data && response.data.transaction) {
+                setTransactions(prev =>
+                    prev.map(t => t.id === transaction.id ? response.data.transaction : t)
+                );
+                
+                // Refresh dashboard data
+                fetchDashboardData();
+                
+                // Show success message
+                toast.success('Transaction updated successfully');
+            } else {
+                throw new Error('Invalid response from server');
+            }
         } catch (err) {
-            setError('Failed to update transaction');
             console.error('Error updating transaction:', err);
+            handleError(err);
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteTransaction = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+        if (!window.confirm('Are you sure you want to delete this transaction?')) return;
 
         try {
             setLoading(true);
+            setError(null);
+            
+            console.log('Deleting transaction:', id);
             await api.delete(`transactions/${id}`);
-
+            
+            // Remove the transaction from the state
             setTransactions(prev => prev.filter(t => t.id !== id));
+            
+            // Refresh dashboard data
             fetchDashboardData();
+            
+            // Show success message
+            toast.success('Transaction deleted successfully');
         } catch (err) {
-            setError('Failed to delete transaction');
             console.error('Error deleting transaction:', err);
+            handleError(err);
         } finally {
             setLoading(false);
         }
@@ -254,18 +311,38 @@ const FinanceManager = () => {
     // Form Validation
     const validateTransaction = (transaction) => {
         const errors = {};
-        if (!transaction.amount || parseFloat(transaction.amount) <= 0) {
-            errors.amount = "Please enter a valid amount";
+        
+        // Check amount
+        if (!transaction.amount || isNaN(parseFloat(transaction.amount)) || parseFloat(transaction.amount) <= 0) {
+            errors.amount = "Please enter a valid amount greater than zero";
         }
+        
+        // Check category
         if (!transaction.category) {
             errors.category = "Please select a category";
         }
+        
+        // Check family member
         if (!transaction.familyMember) {
             errors.familyMember = "Please select a family member";
         }
+        
+        // Check date
         if (!transaction.date) {
             errors.date = "Please select a date";
+        } else {
+            // Validate date format (YYYY-MM-DD)
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(transaction.date)) {
+                errors.date = "Invalid date format. Please use YYYY-MM-DD";
+            }
         }
+        
+        // Check description (optional but if provided, should not be too long)
+        if (transaction.description && transaction.description.length > 200) {
+            errors.description = "Description is too long (maximum 200 characters)";
+        }
+        
         return errors;
     };
 

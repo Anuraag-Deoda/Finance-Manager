@@ -13,9 +13,16 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    
+    // Check if token exists
+    if (!token) {
+      console.log('No token found, logging out...');
+      store.dispatch(logout());
+      return Promise.reject(new Error('Authentication required'));
     }
+    
+    config.headers.Authorization = `Bearer ${token}`;
+    
     // For debugging
     console.log('Request config:', {
       url: config.url,
@@ -46,9 +53,10 @@ api.interceptors.response.use(
     console.error('Response error:', error.response || error);
     
     if (error.response) {
-      // Handle 401 (Unauthorized) and 422 (Unprocessable Entity - Invalid Token)
+      // Handle 401 (Unauthorized), 403 (Forbidden), and 422 (Unprocessable Entity - Invalid Token)
       if (error.response.status === 401 || error.response.status === 422) {
         console.log('Token error detected, logging out...');
+        localStorage.removeItem('token'); // Clear token
         store.dispatch(logout());
       }
       

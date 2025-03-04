@@ -19,6 +19,15 @@ from .config import (
 
 load_dotenv()
 
+class FinanceAgent:
+    def __init__(self, name: str):
+        self.name = name
+
+    def perform_task(self, task: str, data: Dict[str, Any]) -> Any:
+        # Placeholder for agent task execution logic
+        return f"Agent {self.name} performed {task} with data: {data}"
+
+
 class AIFinanceService:
     def __init__(self):
         self.llm = ChatOpenAI(
@@ -27,15 +36,21 @@ class AIFinanceService:
             openai_api_key=os.getenv("OPENAI_API_KEY")
         )
         self.scaler = StandardScaler()
+        self.agents = {
+            'spending_analyzer': FinanceAgent('SpendingAnalyzer'),
+            'budget_recommender': FinanceAgent('BudgetRecommender')
+        }
 
     def analyze_spending_patterns(self, transactions: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze spending patterns using ML and AI."""
-        # Extract amounts and dates
+        # Use agent to perform task
+        agent_response = self.agents['spending_analyzer'].perform_task('analyze_spending', {'transactions': transactions})
+        print(agent_response)  # For demonstration purposes
+        
+        # Existing logic
         amounts = [t['amount'] for t in transactions]
         dates = [datetime.strptime(t['date'], '%Y-%m-%d') for t in transactions]
         categories = [t['category'] for t in transactions]
 
-        # Basic statistical analysis
         total_spent = sum(amounts)
         avg_per_transaction = np.mean(amounts)
         category_totals = {}
@@ -43,7 +58,6 @@ class AIFinanceService:
         for amount, category in zip(amounts, categories):
             category_totals[category] = category_totals.get(category, 0) + amount
 
-        # Identify unusual transactions using configured threshold
         scaled_amounts = self.scaler.fit_transform(np.array(amounts).reshape(-1, 1))
         unusual_indices = np.where(abs(scaled_amounts) > UNUSUAL_TRANSACTION_THRESHOLD)[0]
         unusual_transactions = [transactions[i] for i in unusual_indices]
