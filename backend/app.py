@@ -385,8 +385,7 @@ def create_family():
         return jsonify({'message': 'You are already part of a family'}), 400
 
     family = Family(
-        name=data['name'],
-        created_by=user_id
+        name=data['name']
     )
     db.session.add(family)
     db.session.flush()  # Get family ID
@@ -620,7 +619,7 @@ def login():
             print(f"Failed login attempt for email: {data.get('email')}")
             return jsonify({'message': 'Invalid credentials'}), 401
 
-        token = create_access_token(identity=str(user.id))
+        token = create_access_token(identity=user.id)
         print(f"Created token for user ID: {user.id}")
         print(f"Successful login for user: {user.email}")
         return jsonify({
@@ -1082,7 +1081,6 @@ def save_monthly_plan(month):
             plan = MonthlyPlan(
                 month=month,
                 family_id=user.family_id,
-                created_by=user_id,
                 expected_income=data.get('expectedIncome', []),
                 expected_expenses=data.get('expectedExpenses', []),
                 notes=data.get('notes', '')
